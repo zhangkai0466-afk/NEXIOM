@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local.mathmodel/template-manifest/1.0.0",
+  "title": "Visual Template Manifest 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "templates"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "templates": {"type": "array", "minItems": 1, "items": {"type": "object", "additionalProperties": true, "required": ["template_id", "family", "description", "required_columns", "optional_columns", "required_column_types", "supported_kinds", "keywords", "catalog_source", "selection_eligible", "template_path", "reader_question", "statistical_preconditions", "forbidden_use_cases", "quality_rules"], "properties": {"template_id": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}, "version": {"type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$"}, "family": {"type": "string", "minLength": 1}, "description": {"type": "string", "minLength": 1}, "required_columns": {"type": "array", "items": {"type": "string"}}, "optional_columns": {"type": "array", "items": {"type": "string"}}, "required_column_types": {"type": "object", "additionalProperties": {"enum": ["numeric", "categorical"]}}, "supported_kinds": {"type": "array", "minItems": 1, "items": {"type": "string"}}, "keywords": {"type": "array", "items": {"type": "string"}}, "catalog_source": {"const": "jinja"}, "selection_eligible": {"type": "boolean"}, "template_path": {"type": "string", "pattern": "^[a-z0-9_./-]+\\.py\\.jinja2$"}, "reader_question": {"type": "string", "minLength": 1}, "statistical_preconditions": {"type": "array", "items": {"type": "string"}}, "forbidden_use_cases": {"type": "array", "items": {"type": "string"}}, "quality_rules": {"type": "array", "items": {"type": "string"}}, "data_shape": {"type": "object", "properties": {"minimum_rows": {"type": "integer", "minimum": 1}, "distinct_required_columns": {"type": "boolean"}}}, "hard_filters": {"type": "object", "properties": {"required_request_fields": {"type": "array", "items": {"type": "string"}}, "reject_if_request_contains": {"type": "array", "items": {"type": "string"}}}}}}}
+  }
+}

@@ -1,0 +1,383 @@
+{
+  "schema_version": "reference_appearance_audit/1.0.0",
+  "reviewed_on": "2026-09-09",
+  "folder": "C:/Users/zhuka/Pictures/科研绘图",
+  "review_method": "逐张查看32张原始截图，记录可见组件；不是OCR猜测或只按旧名词归类。",
+  "limits": "截图不能确定源代码、精确色值/alpha、未标明的统计算法与区间定义；不据截图重建研究数据。",
+  "render_contract": "existing executable意味着基础模板能运行，不等于已复现每个参考变体；本审计未进行逐图渲染验收。",
+  "entries": [
+    {
+      "image": "微信图片_20260908103928_322_2.png",
+      "reference_id": "322",
+      "verified_name": "分组回归联合边际图",
+      "components": "中央方形散点；上方x直方图/虚线密度；右侧y横向直方图/密度",
+      "appearance": "组色贯穿点、虚线回归、浅填充带和边际分布；点有深轮廓；边际弱化框线",
+      "purpose": "同时研究组内关系与采样覆盖；边际必须来自主图同一批样本",
+      "caution": "浅色组对比度不足不照搬；带的计算方式和密度带宽不可由截图确认",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103929_323_2.png",
+      "reference_id": "323",
+      "verified_name": "多特征分面KDE—地毯图",
+      "components": "四分面；两组密度曲线；底部原始样本短刻线",
+      "appearance": "浅透明面积、清晰轮廓、rug上下错层；变量分别标轴",
+      "purpose": "研究类别在各变量的偏态、多峰和分布重叠",
+      "caution": "核密度带宽和归一化需登记；不同变量不共用不明尺度",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103930_324_2.png",
+      "reference_id": "324",
+      "verified_name": "分组回归—响应雨云联合图",
+      "components": "左散点/回归带；右共享y轴的半小提琴、箱线和点",
+      "appearance": "主图红方块/蓝圆点；右侧瘦长分布与箱线；淡带深线",
+      "purpose": "关系变化与同一响应的组间分布需要联合阅读",
+      "caution": "右侧不是普通边际直方图；显著性及带定义另需证据",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103930_325_2.png",
+      "reference_id": "325",
+      "verified_name": "模型性能雨云图（附检验结果）",
+      "components": "三个模型AUC；散点—箱线—半小提琴；检验文本框/括号",
+      "appearance": "点、窄黑箱、浅填充分开摆放；黑括号不遮分布",
+      "purpose": "展示真实重复评估分布及已核验检验结果",
+      "caution": "不能从截图证明交叉验证折独立；不能自动生成检验星号",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103931_326_2.png",
+      "reference_id": "326",
+      "verified_name": "双组镜像半小提琴—原始点图",
+      "components": "每类左右各一半密度；两组点；中心摘要数字/线",
+      "appearance": "粉蓝浅面；散点白描边；左右镜像且轻抖动",
+      "purpose": "两组在相同类别下比较完整分布与中心",
+      "caution": "摘要数字类型和黑点含义需来源确认",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103932_327_2.png",
+      "reference_id": "327",
+      "verified_name": "单位点阵计数图＋构成饼图",
+      "components": "每对象竖直堆点；按总数排序；空白处嵌构成饼",
+      "appearance": "单位圆点等大、黑轮廓、三类粉紫色与饼一致",
+      "purpose": "小整数计数与同一集合总体构成联合呈现",
+      "caution": "明确一圆对应单位；饼分类互斥且同一分母",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103932_328_2.png",
+      "reference_id": "328",
+      "verified_name": "分面半小提琴—箱线图",
+      "components": "四面板；情景×时期；窄箱线和右半密度",
+      "appearance": "淡橙/青/近白；箱线清楚、密度较窄、留白多",
+      "purpose": "同一比较任务在多个情景或响应下重复",
+      "caution": "截图不能确认每面板具体响应；原始点不清晰，不称完整雨云",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103933_329_2.png",
+      "reference_id": "329",
+      "verified_name": "SHAP依赖＋背景频数直方图",
+      "components": "九面板；SHAP散点、LOWESS Fit、标称95%CI、背景频数、零线/竖线",
+      "appearance": "绿色点深曲线浅带；灰柱退后；阈值黑底白字",
+      "purpose": "贡献趋势与特征取值支持量联合阅读",
+      "caution": "双y轴分别为频数和贡献；模板分箱中位线不能冒充LOWESS",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103935_330_2.png",
+      "reference_id": "330",
+      "verified_name": "误差着色观测—预测诊断分面图",
+      "components": "训练/测试形状；1:1线；分别拟合线；误差阈值边界；指标框；误差色标",
+      "appearance": "小点低遮挡、蓝红误差色、细诊断线、紧凑指标",
+      "purpose": "比较预测一致性与误差位置；必须分开训练测试统计",
+      "caution": "有一面板为残差预测而非同一响应；误差定义/阈值来源需核验；不是二维分箱",
+      "visual_match_status": "not_render_verified",
+      "catalogue_override": {
+        "status": "name_index_only",
+        "template_id": "",
+        "related_template_id": "faceted_prediction_diagnostics"
+      },
+      "implementation_gap": "当前基础模板按划分用固定颜色，未实现该参考图的误差/密度连续着色、各划分独立拟合和统计框。不能作为精确变体直接执行。"
+    },
+    {
+      "image": "微信图片_20260908103936_331_2.png",
+      "reference_id": "331",
+      "verified_name": "六边形分箱频数—GAM响应曲线图",
+      "components": "多站点分面；hexbin；GAM曲线；峰附近竖线；两侧斜率线",
+      "appearance": "粉紫六边形带边界；黑曲线；红/绿分段斜率；共用Counts色标",
+      "purpose": "高密散点下研究非线性峰值与两侧响应差别",
+      "caution": "色标是分箱计数；不能称普通散点或自动制造最优断点",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103936_332_2.png",
+      "reference_id": "332",
+      "verified_name": "分组椭圆散点＋非对称边际图",
+      "components": "中央组团散点/椭圆；上方直方图＋密度；右侧半小提琴/箱线/点",
+      "appearance": "蓝灰橙同色联动；椭圆深边浅面；边际布局非对称",
+      "purpose": "组团位置、离散和两变量边际覆盖联合解释",
+      "caution": "不是两侧都KDE；椭圆概率/置信定义不可直接推断",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103938_333_2.png",
+      "reference_id": "333",
+      "verified_name": "SHAP交互依赖＋分层趋势图",
+      "components": "交互值散点按另一特征着色；双层趋势与带；背景直方图；分面",
+      "appearance": "绿金对比；灰柱弱化；贡献零线；交点/阈值竖线与标签",
+      "purpose": "审视冻结交互贡献如何随主特征及调节特征变化",
+      "caution": "必须核验真实SHAP交互值，不能普通贡献换名",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103938_334_2.png",
+      "reference_id": "334",
+      "verified_name": "训练测试观测—预测联合边际分面图",
+      "components": "六模型；中央预测散点、1:1/拟合线；上/右直方图与密度",
+      "appearance": "低饱和蓝粉点；紧凑边际；图内模型名和分组R²",
+      "purpose": "比较模型验证表现与数据划分覆盖范围",
+      "caution": "相同验证口径；不能合并训练测试计算一个性能值",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103939_335_2.png",
+      "reference_id": "335",
+      "verified_name": "GeoShapley贡献依赖分面图",
+      "components": "八变量；散点、平滑曲线、贡献零线；共用连续色标",
+      "appearance": "青红点色、细红曲线、横虚线；空格留给色标",
+      "purpose": "空间解释贡献的非线性取值依赖",
+      "caution": "色标写Magnitude但正负/绝对值算法不明；需真实GeoShapley输出",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103940_336_2.png",
+      "reference_id": "336",
+      "verified_name": "PCoA分组散点—椭圆图",
+      "components": "两排序轴含解释率；多组点/椭圆；R²与p文本",
+      "appearance": "组色深边淡面叠加；大点；图例在外",
+      "purpose": "展示已计算距离排序空间中的组内离散与重叠",
+      "caution": "轴明确PCoA不是泛称PCA；椭圆定义及检验方法需另核验",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103941_337_2.png",
+      "reference_id": "337",
+      "verified_name": "三维填充光谱/信号瀑布图",
+      "components": "x波长nm；z幅值mV；深度方向逐条曲线；曲线下填充",
+      "appearance": "蓝紫粉分层；半透明薄片、深色峰线、基线间距、开放背景",
+      "purpose": "比较多条光谱或信号的峰位、峰宽、幅值与重叠",
+      "caution": "不是密度估计也不是连续曲面；不自动归一化真实幅值",
+      "visual_match_status": "not_render_verified",
+      "catalogue_override": {
+        "name": "三维填充光谱/信号瀑布图",
+        "aliases": [
+          "3D filled spectral waterfall",
+          "三维光谱瀑布图",
+          "3D ribbon spectra"
+        ],
+        "family": "waterfall_surface",
+        "reader_question": "多条光谱或信号的峰位、峰宽与幅值如何随样本或条件变化？",
+        "data_shape": "长表：波长/时间/频率、样本或条件、实测幅值；保留物理单位。",
+        "use_when": "需要同时比较峰形及样本顺序，静态视角能保留各曲线层次。",
+        "avoid_when": "关键峰被遮挡或需要精确比较时考虑二维错位曲线；不得把幅值误当概率密度。"
+      }
+    },
+    {
+      "image": "微信图片_20260908103942_338_2.png",
+      "reference_id": "338",
+      "verified_name": "分面柱线双轴比较图",
+      "components": "MSE柱、MAE折线、多个实验面板、星形强调",
+      "appearance": "柱间白隙；黑细边；面板内蓝阶或黄红阶；红细线小点",
+      "purpose": "同一实验顺序下联合比较两项指标",
+      "caution": "MSE和MAE含义不同；星形是否最优要真实数据验证，双轴不证明相关",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103943_339_2.png",
+      "reference_id": "339",
+      "verified_name": "配对箱线—散点轨迹图",
+      "components": "四条件空心箱线、逐样本点、个体连线、比较括号",
+      "appearance": "箱体无实填；深边；浅细配对线；实心点黑边",
+      "purpose": "展示真实配对变化及总体分布",
+      "caution": "没有个体ID不可连线；检验方法需匹配重复测量",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103943_340_2.png",
+      "reference_id": "340",
+      "verified_name": "前后配对半小提琴＋阈值构成图",
+      "components": "两侧向外密度；内侧原始点和逐人连线；右侧前后饼",
+      "appearance": "蓝/粉同色映射；配对线细淡；饼用同一阈值类别",
+      "purpose": "同一批观测的连续变化与阈值分类变化联合展示",
+      "caution": "阈值与分母需冻结；不能把Accuracy文字直接当已核验模型性能",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103944_341_2.png",
+      "reference_id": "341",
+      "verified_name": "类别散点—双边际密度图",
+      "components": "中央五组散点；上方和右侧只有密度面积；零参考线",
+      "appearance": "粉桃灰低饱和；点形也区分类；白边点；边际浅色叠加",
+      "purpose": "二维类别结构与标准化变量边际差异",
+      "caution": "没有回归线；不能据点簇外观断言聚类有效",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103945_342_2.png",
+      "reference_id": "342",
+      "verified_name": "多组回归与交点标注图",
+      "components": "三组点/线/带；A/B/C交点；1:1参考线",
+      "appearance": "蓝青绿轻色带；圆圈交点；低视觉重量边框",
+      "purpose": "真实交点对应决策转换时比较斜率和适用区间",
+      "caution": "1:1线仅当两轴可比较且有意义时保留；截图交点不能直接当阈值",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103946_343_2.png",
+      "reference_id": "343",
+      "verified_name": "多组半小提琴—点云与中心标注图",
+      "components": "十组单侧密度/点；中心圆标签；无明确箱体",
+      "appearance": "蓝青主色夹粉红强调；白圆深边中心值；窄点云",
+      "purpose": "比较多组完整分布并突出核验中心统计量",
+      "caution": "Group1…10不能证明策略强度有序；原名有序梯度过度推断",
+      "visual_match_status": "not_render_verified",
+      "catalogue_override": {
+        "name": "多组半小提琴—点云与中心标注图",
+        "reader_question": "各组分布形状和已核验中心统计量有何差异？",
+        "data_shape": "组别、原始数值和中心统计量定义；不预设组别有序。",
+        "use_when": "多个组需要同时保留分布和原始点，必要时突出重点组。",
+        "avoid_when": "无序组不能以颜色梯度暗示策略强度；摘要标签须注明均值或中位数。"
+      }
+    },
+    {
+      "image": "微信图片_20260908103946_344_2.png",
+      "reference_id": "344",
+      "verified_name": "分组雨云—显著性括号图",
+      "components": "每组左点、中空心箱线、右半小提琴；上方括号",
+      "appearance": "黄蓝粉；点白边；箱体白面深边；密度浅面",
+      "purpose": "同时保留个体、分位数、形状和真实比较结果",
+      "caution": "小样本密度谨慎；星号须有检验及校正信息",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103947_345_2.png",
+      "reference_id": "345",
+      "verified_name": "分面对照半雨云图",
+      "components": "每面板LST/GST两个独立位置；左点右半小提琴；中间摘要线",
+      "appearance": "青/洋红；深轮廓半密度；点白边且深浅变化",
+      "purpose": "同一双变量对照在多情景重复展示",
+      "caution": "不是共中心左右拆分的split violin；点深浅编码机制不明",
+      "visual_match_status": "not_render_verified",
+      "catalogue_override": {
+        "name": "分面对照半雨云图",
+        "aliases": [
+          "faceted half raincloud comparison"
+        ],
+        "data_shape": "响应或情景、数值、对照类别；每类别独立位置，非共中心镜像。"
+      }
+    },
+    {
+      "image": "微信图片_20260908103948_346_2.png",
+      "reference_id": "346",
+      "verified_name": "双组前后雨云＋组摘要连线图",
+      "components": "前后两端外侧密度；两组散点箱线；菱形摘要相连",
+      "appearance": "红蓝深边淡面；组线穿过两端摘要；中央留白",
+      "purpose": "比较组内前后分布及组间变化方向",
+      "caution": "只有组级摘要连线，不是逐个体轨迹；摘要类型需确认",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103949_347_2.png",
+      "reference_id": "347",
+      "verified_name": "分区分期半雨云图",
+      "components": "五指标族顶色带；每族三个年份；点/箱/半密度共轴",
+      "appearance": "顶部标签同组色；竖分区线；密度窄；箱体白摘要",
+      "purpose": "同一定义/可比尺度指标在多个年份的分布变化",
+      "caution": "不得用共同Index value掩盖不同标准化口径",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103949_348_2.png",
+      "reference_id": "348",
+      "verified_name": "密度着色＋外部数据叠加预测分面图",
+      "components": "六模型；Global密度着色圆点；Xinjiang橙点覆盖；1:1线；两套指标",
+      "appearance": "紫绿黄密度色；橙色外部样本白边突出；浅底；统一色标",
+      "purpose": "同时看总体样本密集区域与外部区域预测迁移",
+      "caution": "颜色是密度而非误差；外部组固定橙色不能一起套密度色；不是二维分箱",
+      "visual_match_status": "not_render_verified",
+      "catalogue_override": {
+        "status": "name_index_only",
+        "template_id": "",
+        "related_template_id": "faceted_prediction_diagnostics"
+      },
+      "implementation_gap": "当前基础模板按划分用固定颜色，未实现该参考图的误差/密度连续着色、各划分独立拟合和统计框。不能作为精确变体直接执行。"
+    },
+    {
+      "image": "微信图片_20260908103950_349_2.png",
+      "reference_id": "349",
+      "verified_name": "训练验证预测联合图（KDE＋rug边际）",
+      "components": "中央观测预测；1:1线、拟合/标称95%带；上右KDE和rug",
+      "appearance": "黄橙点带浅色外晕；细拟合线和浅带；边际带填充",
+      "purpose": "同时检验验证覆盖、偏差和边际分布",
+      "caution": "不是边际直方图；相关平方不能替代预测R²；训练验证不混算",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103951_350_2.png",
+      "reference_id": "350",
+      "verified_name": "分组渐变堆叠直方图＋正态拟合线",
+      "components": "同箱内多来源堆叠；每段从浅到深渐变；黑色正态曲线",
+      "appearance": "段内底浅顶深；相邻箱有细白分界；主曲线最清楚",
+      "purpose": "共同箱边界下展示残差来源构成及总体形状",
+      "caution": "渐变不是额外数据维度；正态曲线应按频数/箱宽缩放且不证明正态",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103952_351_2.png",
+      "reference_id": "351",
+      "verified_name": "数值着色三维渐变柱阵列",
+      "components": "二维类别格点；柱高及色标表示强度；柱顶数字和短误差状线",
+      "appearance": "柱阵列留缝；柱侧浅深层次；高值深红低值冷色；浅网格",
+      "purpose": "两个离散因素的响应组合；可在静态正文使用但须可读",
+      "caution": "色标非等距，不能默认线性；柱顶短线含义不确定；不可伪造误差；不要求必须交互",
+      "visual_match_status": "not_render_verified",
+      "catalogue_override": {
+        "use_when": "两个离散因素形成可读柱阵列，柱间距、视角、色标和标签足以表达响应；静态正文也可采用。",
+        "avoid_when": "前排遮挡关键柱、色标含义不明或读者需要精确排名时改用二维对照；不可因追求立体感伪造误差。"
+      }
+    },
+    {
+      "image": "微信图片_20260908103953_352_2.png",
+      "reference_id": "352",
+      "verified_name": "预测—残差及边际频数联合分面图",
+      "components": "四模型；中央预测；左残差对响应；顶/右频数；±20%带；测试指标",
+      "appearance": "青/浅黄区分划分；黑点边；淡灰容许带；边际共色",
+      "purpose": "围绕同一预测误差研究偏差、分布与容许范围",
+      "caution": "±20%是相对容差不是置信带；残差符号及共享坐标须核验",
+      "visual_match_status": "not_render_verified"
+    },
+    {
+      "image": "微信图片_20260908103954_353_2.png",
+      "reference_id": "353",
+      "verified_name": "四组回归联合边际图",
+      "components": "四组GST—LST；上右直方图/虚线密度；散点回归及带",
+      "appearance": "紫红青橙四组一致映射；深点边；虚线拟合；浅色带",
+      "purpose": "类别内关系与采样覆盖需同步比较",
+      "caution": "与322同族不同配色/组数，不算全新基本图型；统计算法仍须来源",
+      "visual_match_status": "not_render_verified"
+    }
+  ],
+  "additional_reference": {
+    "image": "C:/Users/zhuka/AppData/Local/Temp/codex-clipboard-0572f9ca-0e16-4759-aa33-830bd8333a72.png",
+    "name": "浅填充深描边分组柱＋空心原始点＋检验括号",
+    "components": "每个细胞类别四组均值状柱；淡蓝至紫面色；同色较深边；空心抖动点；上方检验括号",
+    "appearance": "柱面、柱边、点边、区间和统计标注独立控制透明度；组内窄缝组间宽缝；不对整个artist统一降低alpha",
+    "caution": "截图不能确认柱高统计量、精确alpha/色值和检验有效性；无原始观测不画伪散点，无检验不造星号",
+    "related_template_id": "grouped_bar_points_interval",
+    "visual_match_status": "not_render_verified",
+    "implementation_gap": "现有模板有浅柱深边和间距，但散点是实心，且默认SEM；尚不是该截图的完整外观和统计合同。"
+  }
+}

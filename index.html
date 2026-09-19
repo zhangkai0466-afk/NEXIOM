@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN" data-starting>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      html[data-starting] { --boot-background: #000; --boot-foreground: #fff; color-scheme: dark; }
+      html[data-starting][data-startup-theme="light"] { --boot-background: #fafafa; --boot-foreground: #202020; color-scheme: light; }
+      html[data-starting], html[data-starting] body { background: var(--boot-background) !important; }
+    </style>
+    <title>NEXIOM</title>
+    <link
+      rel="icon"
+      type="image/png"
+      href="/assets/brand/nexiom-desktop-icon-1024.png"
+    />
+  </head>
+  <body>
+    <style>
+      html, body { margin: 0; background: var(--sidebar, #000); }
+      .boot-fallback { position: fixed; inset: 0; display: grid; place-items: center; background: var(--boot-background, #000); color: var(--boot-foreground, #fff); font: 14px/1.8 "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+      .boot-fallback-help { text-align: center; animation: boot-fallback-show 0s 8s both; }
+      .boot-fallback-help strong { font-size: 22px; font-weight: 300; letter-spacing: .25em; }
+      .boot-fallback-help p { color: #999; }
+      .boot-fallback-help a { color: var(--boot-foreground, #fff); }
+      @keyframes boot-fallback-show { from { visibility: hidden; } to { visibility: visible; } }
+    </style>
+    <div id="root">
+      <div class="boot-fallback" role="status" aria-label="正在启动 NEXIOM">
+        <div class="boot-fallback-help">
+          <strong>NEXIOM</strong>
+          <p>正在打开工作空间…</p>
+          <p>如果此页面持续显示，请<a href="">重新载入</a>。</p>
+        </div>
+        <noscript>请启用 JavaScript 后重新载入 NEXIOM。</noscript>
+      </div>
+    </div>
+    <script type="module" src="/apps/desktop/renderer/main.tsx"></script>
+  </body>
+</html>

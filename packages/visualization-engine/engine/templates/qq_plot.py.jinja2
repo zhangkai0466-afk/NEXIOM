@@ -1,0 +1,29 @@
+{% include "_base_header.py.jinja2" %}
+
+from scipy.stats import norm
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    value_name = encoding["value_column"]
+    values = numeric(require_column(rows, value_name), value_name)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    probabilities = (np.arange(len(values), dtype=float) + 0.5) / len(values)
+    expected = norm.ppf(probabilities)
+    observed = np.sort((values - np.mean(values)) / (np.std(values) or 1.0))
+    low = float(min(expected.min(), observed.min()))
+    high = float(max(expected.max(), observed.max()))
+    ax.axline((low, low), (high, high), color="#777777", linewidth=0.9,
+              linestyle="--", zorder=1)
+    ax.scatter(expected, observed, s=30, color=palette.hex_colors[0], edgecolors=FILL_EDGE,
+               linewidth=0, alpha=0.9, zorder=3)
+    ax.set_xlabel(str(encoding.get("x_label", "理论分位数")))
+    ax.set_ylabel(str(encoding.get("y_label", "样本标准化分位数")))
+    ax.set_title(str(encoding.get("title", "正态性 Q-Q 诊断")))
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

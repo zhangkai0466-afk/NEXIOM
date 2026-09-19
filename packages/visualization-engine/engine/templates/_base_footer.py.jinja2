@@ -1,0 +1,15 @@
+
+
+if __name__ == "__main__":
+    arguments = parse_args()
+    result_paths = render(
+        arguments.data_file,
+        arguments.output_dir,
+        arguments.palette_id,
+        [item.strip() for item in arguments.formats.split(",") if item.strip()],
+        arguments.dpi,
+    )
+    print(json.dumps({
+        "template_id": TEMPLATE_ID, "outputs": [str(path) for path in result_paths],
+        "runtime_rule_checks": RUNTIME_RULE_CHECKS,
+    }, ensure_ascii=False))

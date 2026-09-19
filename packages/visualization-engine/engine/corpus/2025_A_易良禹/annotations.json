@@ -1,0 +1,27 @@
+{
+  "schema_version": "visual_corpus_annotation/1.0.0",
+  "paper_id": "2025_A_易良禹",
+  "figures": [
+    {
+      "figure_id": "fig_4",
+      "page": 8,
+      "kind": "mechanism_diagram",
+      "owner": "local_codex",
+      "visual_form": "2x3 小倍图，几何分类示意",
+      "trigger_pattern": {
+        "text_markers": ["分为 6 种情况", "几何约束", "分类讨论"],
+        "model_structure": "branching_conditions_on_spatial_relations",
+        "context_window_before": 500,
+        "context_window_after": 200
+      },
+      "why_necessary": "六种几何情况无法用公式或表格清楚穷举，视觉分类直接消除空间关系理解障碍。",
+      "reader_obstacle": "读者无法仅从文字理解靠近边界和远离边界时的空间差异。",
+      "ai_prompt_template": "绘制 2 行 3 列的几何示意小倍图，每个子图只展示一种边界位置关系；统一坐标、比例和符号，区域使用不同浅色填充且无黑色描边，结构线用中性灰，中文标签不得重叠。",
+      "lessons": [
+        "分支条件与空间几何同时出现时，应审查是否需要分类示意图。",
+        "图必须服务于读者障碍，不得为了版面重复相邻表格或公式。"
+      ]
+    }
+  ]
+}
+

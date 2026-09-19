@@ -1,0 +1,38 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    x_name, y_name = encoding["x_column"], encoding["y_column"]
+    x = numeric(require_column(rows, x_name), x_name)
+    y = numeric(require_column(rows, y_name), y_name)
+    group_name = str(encoding.get("group_column", ""))
+    groups = require_column(rows, group_name) if group_name else ["路径"] * len(rows)
+    order_name = str(encoding.get("order_column", ""))
+    orders = numeric(require_column(rows, order_name), order_name) if order_name else np.arange(len(rows))
+    label_name = str(encoding.get("label_column", ""))
+    labels = require_column(rows, label_name) if label_name else [""] * len(rows)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    for index, group in enumerate(ordered_unique(groups)):
+        mask = np.asarray([value == group for value in groups], dtype=bool)
+        order = np.argsort(orders[mask])
+        x_group, y_group = x[mask][order], y[mask][order]
+        color = palette.hex_colors[index % palette.count]
+        ax.plot(x_group, y_group, color=color, linewidth=1.8, zorder=3, label=group)
+        ax.scatter(x_group, y_group, s=30, color=color, edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+        for x_value, y_value, label in zip(x_group, y_group, np.asarray(labels)[mask][order]):
+            if label:
+                ax.text(x_value, y_value, label, color=palette.ink, fontsize=8.0, zorder=4)
+    ax.set_xlabel(str(encoding.get("x_label", x_name)))
+    ax.set_ylabel(str(encoding.get("y_label", y_name)))
+    ax.set_title(str(encoding.get("title", "路径方案")))
+    if len(ordered_unique(groups)) > 1:
+        ax.legend()
+    ax.set_aspect(str(encoding.get("aspect", "equal")), adjustable="box")
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

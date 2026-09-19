@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">NEXIOM application icon</title>
+  <desc id="desc">A white geometric letter N with a precise central break on a black rounded square.</desc>
+  <rect width="1024" height="1024" rx="184" fill="#050505"/>
+  <path
+    fill="#FFFFFF"
+    d="M250 760V304l40-40h68l308 390V264h72l36 36v424l-36 36h-72L358 370v390h-72z"
+  />
+  <path
+    fill="#050505"
+    d="M443 548l130-103 18 23-130 103z"
+  />
+</svg>

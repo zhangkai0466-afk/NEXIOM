@@ -1,0 +1,96 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    group_name = str(encoding.get("group_column", ""))
+    groups = require_column(rows, group_name) if group_name else ["全部"] * len(rows)
+    group_labels = ordered_unique(groups)
+
+    if TEMPLATE_ID == "ecdf_plot":
+        values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        for index, group in enumerate(group_labels):
+            series = np.sort(values[np.asarray([item == group for item in groups])])
+            y = np.arange(1, len(series) + 1) / len(series)
+            ax.step(series, y, where="post", color=palette.hex_colors[index % palette.count], linewidth=1.35, zorder=3, label=group)
+        ax.set_xlabel(str(encoding.get("x_label", encoding["value_column"]))); ax.set_ylabel("累计比例")
+    elif TEMPLATE_ID == "violin_box_plot":
+        category_name, value_name = encoding["category_column"], encoding["value_column"]
+        categories = ordered_unique(require_column(rows, category_name)); values = numeric(require_column(rows, value_name), value_name)
+        raw_categories = require_column(rows, category_name)
+        series = [values[np.asarray([item == category for item in raw_categories])] for category in categories]
+        violin = ax.violinplot(series, showmeans=False, showextrema=False, showmedians=False)
+        for index, body in enumerate(violin["bodies"]):
+            body.set_facecolor(palette.hex_colors[index % palette.count]); body.set_edgecolor(FILL_EDGE); body.set_alpha(0.65); body.set_zorder(3)
+        ax.boxplot(series, widths=0.16, showfliers=False, patch_artist=True, zorder=4, boxprops={"facecolor": "white", "edgecolor": "#666666"}, medianprops={"color": "#222222"}, whiskerprops={"color": "#666666"}, capprops={"color": "#666666"})
+        ax.set_xticks(np.arange(1, len(categories) + 1), categories); ax.set_ylabel(str(encoding.get("y_label", value_name)))
+    elif TEMPLATE_ID == "scatter_smooth":
+        x_name, y_name = encoding["x_column"], encoding["y_column"]
+        x, y = numeric(require_column(rows, x_name), x_name), numeric(require_column(rows, y_name), y_name)
+        for index, group in enumerate(group_labels):
+            mask = np.asarray([item == group for item in groups]); gx, gy = x[mask], y[mask]
+            color = palette.hex_colors[index % palette.count]
+            ax.scatter(gx, gy, s=22, alpha=0.62, color=color, edgecolors=FILL_EDGE, linewidth=0, zorder=3, label=group)
+            if len(gx) >= 3 and np.ptp(gx) > 0:
+                order = np.argsort(gx); degree = min(2, len(gx) - 1); coefficients = np.polyfit(gx, gy, degree)
+                grid = np.linspace(gx.min(), gx.max(), 120); ax.plot(grid, np.polyval(coefficients, grid), color=color, linewidth=1.45, zorder=4)
+        ax.set_xlabel(str(encoding.get("x_label", x_name))); ax.set_ylabel(str(encoding.get("y_label", y_name)))
+    elif TEMPLATE_ID == "before_after_series":
+        x_name, value_name, stage_name = encoding["x_column"], encoding["value_column"], encoding["stage_column"]
+        x = numeric(require_column(rows, x_name), x_name); values = numeric(require_column(rows, value_name), value_name); stages = require_column(rows, stage_name)
+        for index, stage in enumerate(ordered_unique(stages)):
+            mask = np.asarray([item == stage for item in stages]); order = np.argsort(x[mask])
+            ax.plot(x[mask][order], values[mask][order], color=palette.hex_colors[index % palette.count], linewidth=1.25, zorder=3, label=stage)
+        ax.set_xlabel(str(encoding.get("x_label", x_name))); ax.set_ylabel(str(encoding.get("y_label", value_name)))
+    elif TEMPLATE_ID == "threshold_tradeoff":
+        x_name, value_name = encoding["threshold_column"], encoding["value_column"]
+        x, values = numeric(require_column(rows, x_name), x_name), numeric(require_column(rows, value_name), value_name)
+        for index, group in enumerate(group_labels):
+            mask = np.asarray([item == group for item in groups]); order = np.argsort(x[mask])
+            ax.plot(x[mask][order], values[mask][order], marker="o", markersize=3.2, color=palette.hex_colors[index % palette.count], linewidth=1.25, zorder=3, label=group)
+        ax.set_xlabel(str(encoding.get("x_label", "阈值"))); ax.set_ylabel(str(encoding.get("y_label", value_name)))
+    elif TEMPLATE_ID == "cumulative_contribution":
+        category_name, value_name = encoding["category_column"], encoding["value_column"]
+        categories = require_column(rows, category_name); values = numeric(require_column(rows, value_name), value_name)
+        order = np.argsort(-values); categories = [categories[index] for index in order]; values = values[order]
+        cumulative = np.cumsum(values) / values.sum() if values.sum() else np.zeros(len(values))
+        ax.bar(np.arange(len(values)), values, color=bar_face_color(palette, 0), edgecolor=bar_edge_color(palette, 0), linewidth=0.9, zorder=3)
+        ax.set_xticks(np.arange(len(values)), categories); ax.set_ylabel(str(encoding.get("y_label", value_name)))
+        secondary = ax.twinx(); secondary.plot(np.arange(len(values)), cumulative, color=palette.hex_colors[1 % palette.count], marker="o", markersize=3, linewidth=1.25, zorder=4); secondary.set_ylim(0, 1.05); secondary.set_ylabel("累计贡献率")
+        secondary.set_axisbelow(True); style_axis(secondary, palette)
+    elif TEMPLATE_ID == "confusion_matrix":
+        actual_name, predicted_name = encoding["actual_column"], encoding["predicted_class_column"]
+        actual, predicted = require_column(rows, actual_name), require_column(rows, predicted_name)
+        labels = ordered_unique(actual + predicted); matrix = np.zeros((len(labels), len(labels)), dtype=int)
+        for a, p in zip(actual, predicted): matrix[labels.index(a), labels.index(p)] += 1
+        image = ax.imshow(matrix, cmap=LinearSegmentedColormap.from_list("confusion", ["#FFFFFF", palette.hex_colors[0]]), zorder=3)
+        for i in range(len(labels)):
+            for j in range(len(labels)): ax.text(j, i, str(matrix[i, j]), ha="center", va="center", fontsize=8, zorder=4)
+        ax.set_xticks(np.arange(len(labels)), labels); ax.set_yticks(np.arange(len(labels)), labels)
+        ax.set_xlabel("预测类别"); ax.set_ylabel("真实类别"); add_borderless_colorbar(fig, image, ax=ax, fraction=0.046, pad=0.04)
+    elif TEMPLATE_ID == "trace_plot":
+        x_name, value_name = encoding["iteration_column"], encoding["value_column"]
+        x, values = numeric(require_column(rows, x_name), x_name), numeric(require_column(rows, value_name), value_name)
+        for index, group in enumerate(group_labels):
+            mask = np.asarray([item == group for item in groups]); order = np.argsort(x[mask])
+            ax.plot(x[mask][order], values[mask][order], color=palette.hex_colors[index % palette.count], linewidth=0.85, alpha=0.85, zorder=3, label=group)
+        ax.set_xlabel("迭代"); ax.set_ylabel(str(encoding.get("y_label", value_name)))
+    elif TEMPLATE_ID == "acf_plot":
+        value_name = encoding["value_column"]; values = numeric(require_column(rows, value_name), value_name); values = values - values.mean()
+        max_lag = min(int(encoding.get("max_lag", 24)), max(1, len(values) // 3)); denominator = np.dot(values, values)
+        correlations = np.asarray([1.0 if lag == 0 else np.dot(values[:-lag], values[lag:]) / denominator for lag in range(max_lag + 1)]) if denominator else np.zeros(max_lag + 1)
+        markerline, stemlines, baseline = ax.stem(np.arange(max_lag + 1), correlations)
+        plt.setp(stemlines, color=palette.hex_colors[0], linewidth=1.1, zorder=3); plt.setp(markerline, color=palette.hex_colors[0], markersize=3.5, zorder=4); plt.setp(baseline, color="#BFC1C5", linewidth=0.7, zorder=1)
+        bound = 1.96 / np.sqrt(len(values)); ax.axhspan(-bound, bound, color=palette.hex_colors[1 % palette.count], alpha=0.12, zorder=1)
+        ax.set_xlabel("滞后阶数"); ax.set_ylabel("自相关系数")
+    else:
+        raise ValueError(f"Unsupported argument expansion template: {TEMPLATE_ID}")
+
+    if group_name and len(group_labels) > 1 and TEMPLATE_ID not in {"confusion_matrix", "cumulative_contribution"}: ax.legend(frameon=False)
+    ax.set_title(str(encoding.get("title", ""))); apply_annotations(ax, encoding); style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

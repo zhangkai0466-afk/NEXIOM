@@ -1,0 +1,169 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://local.mathmodel/visual-design-output/1.0.0",
+  "title": "Visual Design Output 1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "status",
+    "model_calls_started",
+    "figures",
+    "gap_suggestions",
+    "quality_report",
+    "meeting_transcript_path",
+    "presentation_preflight"
+  ],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "run_id": {"type": "string", "minLength": 1},
+    "status": {
+      "enum": [
+        "completed",
+        "blocked_by_missing_data",
+        "blocked_by_roster",
+        "blocked_by_input",
+        "blocked_by_upstream_meeting",
+        "blocked_by_template_catalog",
+        "blocked_by_model_stage",
+        "blocked_by_quality_gate"
+      ]
+    },
+    "model_calls_started": {"type": "boolean"},
+    "figures": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": [
+          "figure_id",
+          "kind",
+          "template_id",
+          "palette_id",
+          "python_code_path",
+          "python_code_sha256",
+          "data_file",
+          "content_ownership",
+          "allowed_conclusions",
+          "forbidden_claims",
+          "render_level",
+          "render_route",
+          "evidence_operation",
+          "encoding_requirements",
+          "template_selection_rationale",
+          "quality_checks_passed",
+          "violations"
+        ],
+        "properties": {
+          "figure_id": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "minLength": 1},
+          "template_id": {"type": "string", "minLength": 1},
+          "palette_id": {"type": "string", "minLength": 1},
+          "python_code_path": {"type": "string", "minLength": 1},
+          "python_code_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "data_file": {"type": "string", "minLength": 1},
+          "data_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "paper_figure_ref": {"type": ["string", "null"]},
+          "content_ownership": {
+            "type": "object", "additionalProperties": false,
+            "required": ["figure_title_owner", "pre_reading_task_owner", "post_conclusion_owner", "encoding_owner", "annotation_owner"],
+            "properties": {
+              "figure_title_owner": {"const": "paper_writing_mcp"},
+              "pre_reading_task_owner": {"const": "paper_writing_mcp"},
+              "post_conclusion_owner": {"const": "paper_writing_mcp"},
+              "encoding_owner": {"const": "visual_design_mcp"},
+              "annotation_owner": {"const": "visual_design_mcp"}
+            }
+          },
+          "allowed_conclusions": {"type": "array", "items": {"type": "string"}},
+          "forbidden_claims": {"type": "array", "items": {"type": "string"}},
+          "render_level": {"enum": ["L1", "L2", "L3"]},
+          "render_route": {"enum": ["presentation_only", "derived_evidence", "new_experiment", "model_change"]},
+          "evidence_operation": {"type": "object", "additionalProperties": true},
+          "encoding_requirements": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "x_column": {"type": "string"},
+              "y_column": {"type": "string"},
+              "hue_column": {"type": "string"},
+              "x_scale": {"enum": ["linear", "log", "symlog", "logit"]},
+              "y_scale": {"enum": ["linear", "log", "symlog", "logit"]},
+              "annotations": {"type": "array", "items": {"type": "object"}},
+              "reference_lines": {"type": "array", "items": {"type": "object"}}
+            }
+          },
+          "template_selection_rationale": {"type": "string", "minLength": 1},
+          "quality_checks_passed": {"type": "boolean"},
+          "violations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["type", "line_number", "detail"],
+              "properties": {
+                "type": {
+                  "enum": [
+                    "missing_fill_edge",
+                    "missing_chinese_font",
+                    "reader_layer_leak",
+                    "syntax_error",
+                    "missing_data_column",
+                    "missing_required_annotation",
+                    "model_quality_gate",
+                    "missing_axis_below",
+                    "axis_line_above_data",
+                    "data_layer_not_foreground",
+                    "axis_layer_draw_order"
+                  ]
+                },
+                "line_number": {"type": "integer", "minimum": 0},
+                "detail": {"type": "string", "minLength": 1}
+              }
+            }
+          }
+        }
+      }
+    },
+    "gap_suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["figure_id", "kind", "reason", "placement_hint"],
+        "properties": {
+          "figure_id": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "minLength": 1},
+          "reason": {"type": "string", "minLength": 1},
+          "placement_hint": {"type": "string", "minLength": 1},
+          "ai_prompt": {"type": "string"}
+        }
+      }
+    },
+    "quality_report": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["total_figures", "passed", "violations_count", "common_issues", "deterministic_gate_passed"],
+      "properties": {
+        "total_figures": {"type": "integer", "minimum": 0},
+        "passed": {"type": "integer", "minimum": 0},
+        "violations_count": {"type": "integer", "minimum": 0},
+        "common_issues": {"type": "array", "items": {"type": "string"}},
+        "deterministic_gate_passed": {"type": "boolean"},
+        "model_gate_decision": {"enum": ["pass", "revise", "not_run"]}
+      }
+    },
+    "meeting_transcript_path": {"type": "string", "minLength": 1},
+    "preflight_report_path": {"type": "string"},
+    "request_updates_path": {"type": "string"},
+    "route_events": {"type": "array", "items": {"type": "object"}},
+    "presentation_preflight": {
+      "type": "object", "additionalProperties": true,
+      "required": ["figure_budget", "grayscale_readability"],
+      "properties": {
+        "figure_budget": {"type": "object", "required": ["body_page_limit", "requested_figure_count", "status", "rule"]},
+        "grayscale_readability": {"type": "object", "required": ["required", "status", "checks"]}
+      }
+    }
+  }
+}

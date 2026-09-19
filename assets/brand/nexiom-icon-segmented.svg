@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">NEXIOM segmented N application icon</title>
+  <desc id="desc">A white segmented geometric N made from five diagonal parallelograms on a black rounded square.</desc>
+  <rect width="1024" height="1024" rx="184" fill="#050505"/>
+  <g fill="#FFFFFF">
+    <path d="M282 220h82l438 584h-82z"/>
+    <path d="M656 220h82l128 170h-82z"/>
+    <path d="M660 424h82l128 170h-82z"/>
+    <path d="M186 430h82l128 170h-82z"/>
+    <path d="M188 634h82l128 170h-82z"/>
+  </g>
+</svg>

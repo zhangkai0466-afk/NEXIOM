@@ -1,0 +1,24 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    category_name, value_name = encoding["category_column"], encoding["value_column"]
+    labels = require_column(rows, category_name)
+    values = numeric(require_column(rows, value_name), value_name)
+    if len(labels) > 8:
+        raise ValueError("Pie template is limited to at most eight categories; use bar_grouped instead")
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    colors = [palette.hex_colors[index % palette.count] for index in range(len(labels))]
+    ax.pie(values, labels=labels, colors=colors, startangle=90, counterclock=False,
+           autopct="%1.1f%%", textprops={"color": palette.ink, "fontsize": 8.2},
+           wedgeprops={"edgecolor": FILL_EDGE, "linewidth": 0, "zorder": 3})
+    ax.set_title(str(encoding.get("title", "构成占比")))
+    ax.set_aspect("equal")
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

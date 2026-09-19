@@ -1,0 +1,34 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    x_name, y_name = encoding["x_column"], encoding["y_column"]
+    x, y = numeric(require_column(rows, x_name), x_name), numeric(require_column(rows, y_name), y_name)
+    dominated_name = str(encoding.get("dominated_column", ""))
+    if dominated_name:
+        flags = [value.strip().lower() in {"1", "true", "yes", "是"} for value in require_column(rows, dominated_name)]
+        dominated = np.asarray(flags, dtype=bool)
+    else:
+        dominated = np.zeros(len(rows), dtype=bool)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    if np.any(dominated):
+        ax.scatter(x[dominated], y[dominated], s=24, color=palette.hex_colors[0], alpha=0.45,
+                   edgecolors=FILL_EDGE, linewidth=0, label="被支配解", zorder=3)
+    front = ~dominated
+    ax.scatter(x[front], y[front], s=34, color=palette.hex_colors[palette.accent_index], alpha=0.92,
+               edgecolors=FILL_EDGE, linewidth=0, label="帕累托解", zorder=3)
+    order = np.argsort(x[front])
+    ax.plot(x[front][order], y[front][order], color=palette.hex_colors[palette.accent_index],
+            linewidth=1.2, zorder=3)
+    ax.set_xlabel(str(encoding.get("x_label", x_name)))
+    ax.set_ylabel(str(encoding.get("y_label", y_name)))
+    ax.set_title(str(encoding.get("title", "帕累托前沿")))
+    ax.legend()
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

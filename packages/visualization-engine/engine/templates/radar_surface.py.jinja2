@@ -1,0 +1,95 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    palette = setup_style(palette_id)
+    fig = plt.figure(figsize=CONFIG["figsize"])
+    if TEMPLATE_ID == "radar_profile":
+        if encoding.get("normalized_to_unit_interval") is not True or encoding.get("higher_is_better") is not True:
+            raise ValueError("雷达图须显式确认0到1归一化且指标同向；归一化在证据准备阶段完成。")
+        categories = ordered_unique(require_column(rows, encoding["category_column"]))
+        groups = ordered_unique(require_column(rows, encoding["group_column"]))
+        if len(categories) < 3:
+            raise ValueError("雷达图至少需要三个指标。")
+        ax = fig.add_subplot(111, projection="polar")
+        apply_axis_layer(ax, encoding)
+        angles = np.linspace(0, 2 * np.pi, len(categories), endpoint=False)
+        closed = np.r_[angles, angles[0]]
+        for i, group in enumerate(groups):
+            selected = [r for r in rows if r[encoding["group_column"]] == group]
+            if len(selected) != len(categories) or len({r[encoding["category_column"]] for r in selected}) != len(categories):
+                raise ValueError("每个方案必须具有相同且无重复的指标集合。")
+            lookup = {r[encoding["category_column"]]: r[encoding["value_column"]] for r in selected}
+            values = numeric([lookup[c] for c in categories], encoding["value_column"])
+            if not np.isfinite(values).all() or np.any((values < 0) | (values > 1)):
+                raise ValueError("雷达图值必须位于0到1之间。")
+            values = np.r_[values, values[0]]
+            color = plot_color(palette, i)
+            ax.plot(closed, values, color=color, linewidth=1.5, marker="o", markersize=3, label=group, zorder=3)
+            ax.fill(closed, values, color=color, alpha=0.10, edgecolor=FILL_EDGE, linewidth=0)
+        ax.set_theta_offset(np.pi / 2)
+        ax.set_theta_direction(-1)
+        ax.set_xticks(angles, categories)
+        ax.set_ylim(0, 1)
+        ax.grid(color="#D8DDE2", linewidth=0.65, zorder=0)
+        ax.spines["polar"].set_color("#BFC7CE")
+        ax.legend(loc="upper left", bbox_to_anchor=(1.08, 1.08))
+    else:
+        fig.set_size_inches(max(7.2, CONFIG["figsize"][0]), max(5.2, CONFIG["figsize"][1]))
+        fig._skip_tight_layout = True
+        fig.subplots_adjust(left=.06, right=.86, bottom=.10, top=.88)
+        ax = fig.add_subplot(111, projection="3d")
+        if TEMPLATE_ID == "bar_3d":
+            rn, cn, vn = (encoding[k] for k in ("row_column", "column_column", "value_column"))
+            rs, cs = ordered_unique(require_column(rows, rn)), ordered_unique(require_column(rows, cn))
+            seen = set()
+            for row in rows:
+                pair = (row[rn], row[cn])
+                if pair in seen:
+                    raise ValueError("三维柱图类别组合重复，须先明确聚合口径。")
+                seen.add(pair)
+                v = float(row[vn])
+                if not np.isfinite(v):
+                    raise ValueError("三维柱图不能包含非有限数值。")
+                ri, ci = rs.index(pair[0]), cs.index(pair[1])
+                ax.bar3d(ci - .32, ri - .32, min(0, v), .64, .64, abs(v),
+                         color=bar_face_color(palette, ri), edgecolor=bar_edge_color(palette, ri),
+                         linewidth=.45, shade=True)
+            ax.set_xticks(range(len(cs)), cs)
+            ax.set_yticks(range(len(rs)), rs)
+            ax.set_xlabel(str(encoding.get("x_label", cn)))
+            ax.set_ylabel(str(encoding.get("y_label", rn)))
+            ax.text2D(.02, .98, str(encoding.get("z_label", vn)), transform=ax.transAxes, ha="left", va="top")
+        else:
+            xn, yn, zn = (encoding[k] for k in ("x_column", "y_column", "z_column"))
+            points = [(float(r[xn]), float(r[yn]), float(r[zn])) for r in rows]
+            if not np.isfinite(np.asarray(points)).all():
+                raise ValueError("曲面数据包含非有限值。")
+            xs, ys = sorted({p[0] for p in points}), sorted({p[1] for p in points})
+            lookup = {(x, y): z for x, y, z in points}
+            if len(xs) < 2 or len(ys) < 2 or len(lookup) != len(points) or len(points) != len(xs) * len(ys):
+                raise ValueError("曲面需要无重复的完整二维网格；不会自动补点或插值。")
+            x, y = np.meshgrid(xs, ys)
+            z = np.asarray([[lookup[(xx, yy)] for xx in xs] for yy in ys])
+            cmap = LinearSegmentedColormap.from_list("studio_surface", palette.hex_colors)
+            if encoding.get("surface_style") == "wireframe":
+                ax.plot_wireframe(x, y, z, color=plot_color(palette, 0), linewidth=.65)
+            else:
+                surface = ax.plot_surface(x, y, z, cmap=cmap, edgecolor=FILL_EDGE, linewidth=0, antialiased=True)
+                add_borderless_colorbar(fig, surface, ax=ax, shrink=.65, pad=.12, label=str(encoding.get("z_label", zn)))
+            ax.set_xlabel(str(encoding.get("x_label", xn)))
+            ax.set_ylabel(str(encoding.get("y_label", yn)))
+            ax.text2D(.02, .98, str(encoding.get("z_label", zn)), transform=ax.transAxes, ha="left", va="top")
+            ax.xaxis.set_major_locator(mticker.MaxNLocator(4))
+            ax.yaxis.set_major_locator(mticker.MaxNLocator(4))
+        ax.tick_params(pad=1)
+        ax.xaxis.labelpad = 10
+        ax.yaxis.labelpad = 10
+        ax.view_init(elev=float(encoding.get("elevation", 26)), azim=float(encoding.get("azimuth", -55)))
+        for axis in (ax.xaxis, ax.yaxis, ax.zaxis):
+            axis.pane.fill = False
+    ax.set_title(str(encoding.get("title", "")), pad=20)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

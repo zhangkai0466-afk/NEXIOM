@@ -1,0 +1,49 @@
+{
+  "name": "nexiom",
+  "version": "0.6.20",
+  "private": true,
+  "type": "module",
+  "main": ".build/desktop.cjs",
+  "engines": {
+    "node": ">=24.0.0"
+  },
+  "scripts": {
+    "prepare:app": "node scripts/build-host.mjs",
+    "dev": "npm run prepare:app && vite --host 127.0.0.1",
+    "desktop": "npm run build && electron .",
+    "build": "tsc --noEmit && npm run prepare:app && vite build",
+    "test": "npm run prepare:app && node --test --test-concurrency=1 tests/*.test.mjs",
+    "package:win": "npm run build && node scripts/package-windows.mjs",
+    "check": "tsc --noEmit",
+    "visual:import": "node scripts/import-visual-design.mjs",
+    "visual:catalog": "python -B packages/visualization-engine/export_catalog.py",
+    "visual:check": "python -I -X utf8 -B -u packages/visualization-engine/native.py --check"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@openai/codex": "0.154.0",
+    "katex": "^0.18.7",
+    "lucide-react": "^0.468.0",
+    "motion": "^13.4.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "react-markdown": "^10.1.0",
+    "rehype-katex": "^7.0.1",
+    "remark-gfm": "^4.0.1",
+    "remark-math": "^6.0.0",
+    "thinking-orbs": "^0.3.1",
+    "zod": "^3.24.0",
+    "zod-to-json-schema": "^3.25.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^6.0.0",
+    "electron": "^44.4.1",
+    "esbuild": "^0.28.0",
+    "rcedit": "^5.0.2",
+    "typescript": "^5.9.0",
+    "vite": "^8.3.0"
+  }
+}

@@ -1,0 +1,33 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    task_name, start_name, end_name = encoding["task_column"], encoding["start_column"], encoding["end_column"]
+    tasks = require_column(rows, task_name)
+    starts = numeric(require_column(rows, start_name), start_name)
+    ends = numeric(require_column(rows, end_name), end_name)
+    if np.any(ends < starts):
+        raise ValueError("end_column must be greater than or equal to start_column")
+    groups = require_column(rows, str(encoding["group_column"])) if encoding.get("group_column") else ["任务"] * len(tasks)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    y = np.arange(len(tasks), dtype=float)
+    for index, (task, start, end, group) in enumerate(zip(tasks, starts, ends, groups)):
+        ax.barh(y[index], end - start, left=start, height=0.62,
+                color=bar_face_color(palette, index), edgecolor=bar_edge_color(palette, index),
+                linewidth=0.9, label=group, zorder=3)
+    ax.set_yticks(y, tasks)
+    ax.set_xlabel(str(encoding.get("x_label", "时间")))
+    ax.set_ylabel(str(encoding.get("y_label", task_name)))
+    ax.set_title(str(encoding.get("title", "任务排程")))
+    if len(ordered_unique(groups)) > 1:
+        handles, labels = ax.get_legend_handles_labels()
+        unique = dict(zip(labels, handles))
+        ax.legend(unique.values(), unique.keys())
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

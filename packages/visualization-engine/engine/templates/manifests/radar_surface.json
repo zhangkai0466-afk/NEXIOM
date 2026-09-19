@@ -1,0 +1,139 @@
+{
+  "schema_version": "1.0.0",
+  "templates": [
+    {
+      "template_id": "radar_profile",
+      "version": "1.6.0",
+      "family": "multivariate",
+      "description": "雷达图：同尺度多指标轮廓",
+      "required_columns": [
+        "category_column",
+        "value_column",
+        "group_column"
+      ],
+      "required_column_types": {
+        "category_column": "categorical",
+        "value_column": "numeric",
+        "group_column": "categorical"
+      },
+      "keywords": [
+        "radar chart",
+        "Radar Plot",
+        "Spider Plot",
+        "雷达图",
+        "蜘蛛图"
+      ],
+      "statistical_preconditions": [
+        "指标已统一方向并归一化至0到1；至少三个指标；各方案指标集合一致"
+      ],
+      "forbidden_use_cases": [
+        "不得比较不同单位原值或将多边形面积解释为总分"
+      ],
+      "optional_columns": [],
+      "supported_kinds": [
+        "data_driven_plot"
+      ],
+      "catalog_source": "jinja",
+      "selection_eligible": true,
+      "template_path": "radar_surface.py.jinja2",
+      "reader_question": "雷达图：同尺度多指标轮廓",
+      "quality_rules": [
+        "PS-FILL-001",
+        "PS-LAYER-001"
+      ],
+      "data_shape": {
+        "minimum_rows": 3,
+        "distinct_required_columns": true
+      }
+    },
+    {
+      "template_id": "bar_3d",
+      "version": "1.6.0",
+      "family": "comparison",
+      "description": "三维柱阵列：双离散维度的数值",
+      "required_columns": [
+        "row_column",
+        "column_column",
+        "value_column"
+      ],
+      "required_column_types": {
+        "row_column": "categorical",
+        "column_column": "categorical",
+        "value_column": "numeric"
+      },
+      "keywords": [
+        "3D Bar Plot",
+        "bar3d",
+        "3d柱状图",
+        "三维柱状图"
+      ],
+      "statistical_preconditions": [
+        "每个类别组合唯一；选择视角后各柱顶可辨识"
+      ],
+      "forbidden_use_cases": [
+        "不得把缺失组合当零；不得用透视柱体体积进行精确比较"
+      ],
+      "optional_columns": [],
+      "supported_kinds": [
+        "data_driven_plot"
+      ],
+      "catalog_source": "jinja",
+      "selection_eligible": true,
+      "template_path": "radar_surface.py.jinja2",
+      "reader_question": "三维柱阵列：双离散维度的数值",
+      "quality_rules": [
+        "PS-FILL-001",
+        "PS-LAYER-001"
+      ],
+      "data_shape": {
+        "minimum_rows": 3,
+        "distinct_required_columns": true
+      }
+    },
+    {
+      "template_id": "surface_3d",
+      "version": "1.6.0",
+      "family": "surface",
+      "description": "三维响应曲面与线框",
+      "required_columns": [
+        "x_column",
+        "y_column",
+        "z_column"
+      ],
+      "required_column_types": {
+        "x_column": "numeric",
+        "y_column": "numeric",
+        "z_column": "numeric"
+      },
+      "keywords": [
+        "3D Surface Plot",
+        "Wireframe Surface",
+        "Color-Mapped Surface",
+        "3d曲面图",
+        "响应面"
+      ],
+      "statistical_preconditions": [
+        "完整二维数值网格；每个坐标组合唯一；两自变量连续"
+      ],
+      "forbidden_use_cases": [
+        "不得静默插值缺失网格或把离散类别连成连续曲面"
+      ],
+      "optional_columns": [],
+      "supported_kinds": [
+        "data_driven_plot"
+      ],
+      "catalog_source": "jinja",
+      "selection_eligible": true,
+      "template_path": "radar_surface.py.jinja2",
+      "reader_question": "三维响应曲面与线框",
+      "quality_rules": [
+        "PS-FILL-001",
+        "PS-LAYER-001"
+      ],
+      "data_shape": {
+        "minimum_rows": 3,
+        "distinct_required_columns": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,28 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    x_name, y_name = encoding["x_column"], encoding["y_column"]
+    lower_name, upper_name = encoding["lower_column"], encoding["upper_column"]
+    x = numeric(require_column(rows, x_name), x_name)
+    y = numeric(require_column(rows, y_name), y_name)
+    lower = numeric(require_column(rows, lower_name), lower_name)
+    upper = numeric(require_column(rows, upper_name), upper_name)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    order = np.argsort(x)
+    x, y, lower, upper = x[order], y[order], lower[order], upper[order]
+    color = palette.hex_colors[0]
+    ax.fill_between(x, lower, upper, color=color, alpha=0.18, edgecolor=FILL_EDGE, linewidth=0, zorder=3)
+    ax.plot(x, y, color=color, linewidth=1.8, marker="o", markersize=3.5,
+            markeredgecolor=FILL_EDGE, zorder=3)
+    ax.set_xlabel(str(encoding.get("x_label", x_name)))
+    ax.set_ylabel(str(encoding.get("y_label", y_name)))
+    ax.set_title(str(encoding.get("title", "不确定性区间")))
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

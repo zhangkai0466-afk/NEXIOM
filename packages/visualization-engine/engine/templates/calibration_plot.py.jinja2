@@ -1,0 +1,36 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    predicted_name, observed_name = encoding["predicted_column"], encoding["observed_column"]
+    predicted = numeric(require_column(rows, predicted_name), predicted_name)
+    observed = numeric(require_column(rows, observed_name), observed_name)
+    group_name = str(encoding.get("group_column", ""))
+    groups = require_column(rows, group_name) if group_name else ["数据"] * len(rows)
+    size_name = str(encoding.get("size_column", ""))
+    sizes = numeric(require_column(rows, size_name), size_name) if size_name else np.full(len(rows), 30.0)
+    if size_name:
+        finite = sizes[np.isfinite(sizes)]
+        low, high = (float(np.min(finite)), float(np.max(finite))) if finite.size else (0.0, 1.0)
+        sizes = 24.0 + 76.0 * (sizes - low) / max(high - low, 1e-12)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    if not encoding.get("reference_lines"):
+        ax.axline((0, 0), (1, 1), color="#777777", linewidth=0.9, linestyle="--", zorder=1)
+    for index, group in enumerate(ordered_unique(groups)):
+        mask = np.asarray([value == group for value in groups], dtype=bool)
+        ax.scatter(predicted[mask], observed[mask], s=sizes[mask], color=plot_color(palette, index),
+                   edgecolors=FILL_EDGE, linewidth=0, alpha=0.9, label=group, zorder=3)
+    ax.set_xlabel(str(encoding.get("x_label", predicted_name)))
+    ax.set_ylabel(str(encoding.get("y_label", observed_name)))
+    ax.set_title(str(encoding.get("title", "校准曲线")))
+    has_labeled_reference = any(str(line.get("label", "")).strip() for line in encoding.get("reference_lines", []) if isinstance(line, dict))
+    if len(ordered_unique(groups)) > 1 or has_labeled_reference:
+        ax.legend()
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

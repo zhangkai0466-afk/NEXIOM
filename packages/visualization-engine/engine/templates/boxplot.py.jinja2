@@ -1,0 +1,30 @@
+{% include "_base_header.py.jinja2" %}
+import seaborn as sns
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    category_name, value_name = encoding["category_column"], encoding["value_column"]
+    categories = require_column(rows, category_name)
+    values = numeric(require_column(rows, value_name), value_name)
+    labels = ordered_unique(categories)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    sns.boxplot(x=categories, y=values, hue=categories, order=labels, hue_order=labels,
+                         palette={label: palette.hex_colors[i % palette.count] for i, label in enumerate(labels)},
+                         saturation=1, dodge=False, legend=False, ax=ax,
+                         boxprops={"edgecolor": FILL_EDGE, "linewidth": 0},
+                         medianprops={"color": "#666666", "linewidth": 1.1},
+                         whiskerprops={"color": "#888888", "linewidth": 0.8},
+                         capprops={"color": "#888888", "linewidth": 0.8},
+                         flierprops={"marker": "o", "markerfacecolor": palette.hex_colors[0],
+                                     "markeredgecolor": FILL_EDGE}, zorder=3)
+    ax.set_xlabel(str(encoding.get("x_label", category_name)))
+    ax.set_ylabel(str(encoding.get("y_label", value_name)))
+    ax.set_title(str(encoding.get("title", "")))
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

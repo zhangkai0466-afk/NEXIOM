@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">NEXIOM slash N application icon</title>
+  <desc id="desc">A geometric N implied by four forward-slanted white bars on a black rounded square.</desc>
+  <rect width="1024" height="1024" rx="184" fill="#050505"/>
+  <g fill="#FFFFFF">
+    <path d="M322 776H228l94-528h94z"/>
+    <path d="M492 505h-84l27-151h84z"/>
+    <path d="M586 670h-84l27-151h84z"/>
+    <path d="M692 776h-84l94-528h84z"/>
+  </g>
+</svg>

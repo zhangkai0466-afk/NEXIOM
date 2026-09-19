@@ -1,0 +1,77 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    if TEMPLATE_ID == "observed_predicted_scatter":
+        observed = numeric(require_column(rows, encoding["observed_column"]), encoding["observed_column"])
+        predicted = numeric(require_column(rows, encoding["predicted_column"]), encoding["predicted_column"])
+        lo, hi = min(observed.min(), predicted.min()), max(observed.max(), predicted.max())
+        ax.axline((lo, lo), (hi, hi), color="#777777", linestyle="--", linewidth=0.9, zorder=1, label="y=x")
+        ax.scatter(observed, predicted, s=30, color=plot_color(palette, 0), edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+        label_name = str(encoding.get("label_column", ""))
+        if label_name:
+            labels = require_column(rows, label_name)
+            differences = np.abs(predicted - observed)
+            selected = np.argsort(differences)[-min(4, len(differences)):]
+            offsets = [(5, 6), (5, -11), (-6, 7), (-6, -12)]
+            for rank, index in enumerate(selected):
+                dx, dy = offsets[rank]
+                ax.annotate(str(labels[index]), (observed[index], predicted[index]), xytext=(dx, dy),
+                            textcoords="offset points", fontsize=7.2, color="#4F5962",
+                            ha="left" if dx > 0 else "right")
+        ax.set_xlabel(str(encoding.get("x_label", encoding["observed_column"])))
+        ax.set_ylabel(str(encoding.get("y_label", encoding["predicted_column"])))
+        ax.set_aspect("equal", adjustable="box")
+    elif TEMPLATE_ID in {"multi_metric_heatmap", "two_way_sensitivity_heatmap"}:
+        rows_name, cols_name, value_name = encoding["row_column"], encoding["column_column"], encoding["value_column"]
+        labels_y, labels_x = ordered_unique(require_column(rows, rows_name)), ordered_unique(require_column(rows, cols_name))
+        matrix = np.full((len(labels_y), len(labels_x)), np.nan)
+        for r, c, value in zip(require_column(rows, rows_name), require_column(rows, cols_name), numeric(require_column(rows, value_name), value_name)):
+            matrix[labels_y.index(r), labels_x.index(c)] = value
+        image = ax.imshow(matrix, cmap=LinearSegmentedColormap.from_list("paper", palette.hex_colors), aspect="auto", zorder=3)
+        ax.set_xticks(np.arange(len(labels_x)), labels_x); ax.set_yticks(np.arange(len(labels_y)), labels_y)
+        finite = matrix[np.isfinite(matrix)]
+        midpoint = float(np.nanmin(finite) + np.nanmax(finite)) / 2 if finite.size else 0.0
+        for row_index in range(matrix.shape[0]):
+            for col_index in range(matrix.shape[1]):
+                value = matrix[row_index, col_index]
+                if np.isfinite(value):
+                    label = f"{value:.0f}" if float(value).is_integer() else f"{value:.2f}"
+                    color = "#FFFFFF" if value > midpoint else "#263238"
+                    ax.text(col_index, row_index, label, ha="center", va="center",
+                            fontsize=8.5, fontweight="semibold", color=color, zorder=4)
+        add_borderless_colorbar(fig, image, ax=ax, fraction=0.046, pad=0.04,
+                                label=str(encoding.get("colorbar_label", value_name)))
+        ax.set_xlabel(str(encoding.get("x_label", cols_name))); ax.set_ylabel(str(encoding.get("y_label", rows_name)))
+    elif TEMPLATE_ID in {"ablation_grouped_bar", "before_after_comparison"}:
+        categories = ordered_unique(require_column(rows, encoding["category_column"]))
+        values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        groups_name = str(encoding.get("group_column", "")); groups = require_column(rows, groups_name) if groups_name else ["数值"] * len(rows)
+        group_labels = ordered_unique(groups); width = 0.78 / max(1, len(group_labels)); positions = np.arange(len(categories))
+        for i, group in enumerate(group_labels):
+            series = [values[next(j for j, item in enumerate(groups) if item == group and require_column(rows, encoding["category_column"])[j] == category)] for category in categories]
+            ax.bar(positions + (i - (len(group_labels) - 1) / 2) * width, series, width=width * 0.84, color=bar_face_color(palette, i), edgecolor=bar_edge_color(palette, i), linewidth=0.9, zorder=3, label=group)
+        ax.set_xticks(positions, categories); ax.set_ylabel(str(encoding.get("y_label", encoding["value_column"]))); ax.legend()
+    elif TEMPLATE_ID == "one_way_sensitivity_curve":
+        x = numeric(require_column(rows, encoding["x_column"]), encoding["x_column"]); y = numeric(require_column(rows, encoding["y_column"]), encoding["y_column"])
+        order = np.argsort(x); ax.plot(x[order], y[order], color=palette.hex_colors[0], marker="o", markersize=3.8, linewidth=1.35, zorder=3)
+        ax.set_xlabel(str(encoding.get("x_label", encoding["x_column"]))); ax.set_ylabel(str(encoding.get("y_label", encoding["y_column"])))
+    elif TEMPLATE_ID == "bootstrap_distribution":
+        values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        ax.hist(values, bins=min(20, max(5, int(np.sqrt(len(values))))), color=palette.hex_colors[0], edgecolor=FILL_EDGE, linewidth=0, zorder=3)
+        ax.set_xlabel(str(encoding.get("x_label", encoding["value_column"]))); ax.set_ylabel(str(encoding.get("y_label", "频数")))
+    elif TEMPLATE_ID == "residual_distribution_panel":
+        values = numeric(require_column(rows, encoding["residual_column"]), encoding["residual_column"])
+        ax.hist(values, bins=min(20, max(5, int(np.sqrt(len(values))))), color=palette.hex_colors[1 % palette.count], edgecolor=FILL_EDGE, linewidth=0, zorder=3)
+        ax.axvline(0, color="#777777", linestyle="--", linewidth=0.9, zorder=1)
+        ax.set_xlabel(str(encoding.get("x_label", encoding["residual_column"]))); ax.set_ylabel(str(encoding.get("y_label", "频数")))
+    else:
+        raise ValueError(f"Unsupported paper analysis template: {TEMPLATE_ID}")
+    ax.set_title(str(encoding.get("title", ""))); apply_annotations(ax, encoding); style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

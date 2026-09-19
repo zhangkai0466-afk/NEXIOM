@@ -1,0 +1,100 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    category_name = encoding["category_column"]
+    estimate_name = encoding["estimate_column"]
+    lower_name = encoding["lower_column"]
+    upper_name = encoding["upper_column"]
+    filter_name = str(encoding.get("filter_column", ""))
+    filter_values = {str(value) for value in encoding.get("filter_values", [])}
+    if filter_name and filter_values:
+        rows = [row for row in rows if str(row.get(filter_name, "")) in filter_values]
+    rows = [row for row in rows if all(str(row.get(name, "")).strip() for name in (category_name, estimate_name, lower_name, upper_name))]
+    excluded = {str(value) for value in encoding.get("exclude_categories", [])}
+    if excluded:
+        rows = [row for row in rows if str(row.get(category_name, "")) not in excluded]
+    categories = require_column(rows, category_name)
+    estimates = numeric(require_column(rows, estimate_name), estimate_name)
+    lower = numeric(require_column(rows, lower_name), lower_name)
+    upper = numeric(require_column(rows, upper_name), upper_name)
+    group_name = str(encoding.get("group_column", ""))
+    group_values = require_column(rows, group_name) if group_name else ["数据"] * len(rows)
+    category_order, group_order = ordered_unique(categories), ordered_unique(group_values)
+    palette = setup_style(palette_id)
+    category_label_map = encoding.get("category_label_map", {})
+    highlighted = {str(value) for value in encoding.get("highlight_categories", [])}
+
+    # A long roster of distinct configurations should be compared as compact
+    # family facets, not stretched into a poster-height one-column figure.
+    if len(category_order) > 12 and len(group_order) in (2, 3) and len(category_order) == len(rows):
+        counts = [sum(value == group for value in group_values) for group in group_order]
+        width_ratios = [max(4, count) for count in counts]
+        fig, axes_grid = plt.subplots(
+            1, len(group_order),
+            figsize=(10.8, min(7.0, 2.4 + 0.30 * max(counts))),
+            gridspec_kw={"width_ratios": width_ratios}, squeeze=False,
+        )
+        for group_index, (ax, group) in enumerate(zip(axes_grid[0], group_order)):
+            apply_axis_layer(ax, encoding)
+            idx = [index for index, value in enumerate(group_values) if value == group]
+            local_categories = [categories[index] for index in idx]
+            points, lo, hi = estimates[idx], lower[idx], upper[idx]
+            errors = np.vstack([np.maximum(0, points - lo), np.maximum(0, hi - points)])
+            y_local = np.arange(len(idx), dtype=float)
+            color = plot_color(palette, group_index)
+            ax.errorbar(points, y_local, xerr=errors, fmt="o", color=color,
+                        ecolor=color, capsize=2.8, markersize=4.5,
+                        linewidth=1.1, zorder=3)
+            labels = [
+                ("★ " if category in highlighted else "")
+                + str(category_label_map.get(str(category), category))
+                for category in local_categories
+            ]
+            ax.set_yticks(y_local, labels)
+            ax.set_ylim(-0.55, max(0.55, len(idx) - 0.45))
+            ax.set_title(str(encoding.get("group_label_map", {}).get(str(group), group)),
+                         color=color, fontweight="bold")
+            ax.set_xlabel(str(encoding.get("x_label", estimate_name)))
+            ax.set_ylabel("")
+            style_axis(ax, palette)
+        fig.suptitle(str(encoding.get("title", "")), y=0.995)
+        fig.tight_layout()
+        return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+    height = 2.8 if len(category_order) <= 2 else max(float(CONFIG["figsize"][1]), 2.4 + 0.27 * len(category_order))
+    CONFIG["figsize"][1] = height
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    y = np.arange(len(category_order), dtype=float)
+    offsets = np.linspace(-0.22, 0.22, max(1, len(group_order)))
+    for group_index, group in enumerate(group_order):
+        selected = [index for index, value in enumerate(group_values) if value == group]
+        by_category = {categories[index]: index for index in selected}
+        valid_categories = [category for category in category_order if category in by_category]
+        idx = [by_category[category] for category in valid_categories]
+        points, lo, hi = estimates[idx], lower[idx], upper[idx]
+        errors = np.vstack([np.maximum(0, points - lo), np.maximum(0, hi - points)])
+        positions = np.asarray([category_order.index(category) for category in valid_categories], dtype=float) + offsets[group_index]
+        group_label = str(encoding.get("group_label_map", {}).get(str(group), group))
+        ax.errorbar(points, positions, xerr=errors, fmt="o", color=plot_color(palette, group_index),
+                    ecolor=plot_color(palette, group_index), capsize=2.8,
+                    markersize=4.2, linewidth=1.05, label=group_label, zorder=3)
+    display_categories = [
+        ("★ " if category in highlighted else "") + str(category_label_map.get(str(category), category))
+        for category in category_order
+    ]
+    ax.set_yticks(y, display_categories)
+    ax.set_ylim(-0.55, max(0.55, len(category_order) - 0.45))
+    ax.set_xlabel(str(encoding.get("x_label", estimate_name)))
+    ax.set_ylabel(str(encoding.get("y_label", "")))
+    ax.set_title(str(encoding.get("title", "")))
+    has_labeled_reference = any(str(line.get("label", "")).strip() for line in encoding.get("reference_lines", []) if isinstance(line, dict))
+    if len(group_order) > 1 or has_labeled_reference:
+        ax.legend()
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

@@ -1,0 +1,36 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    x_name, y_name = encoding["x_column"], encoding["y_column"]
+    if encoding.get("missing_policy") == "drop_explicit":
+        total = len(rows)
+        rows = [r for r in rows if all(str(r.get(k, "")).strip().lower() not in {"", "na", "nan", "null", "none"} for k in (x_name, y_name))]
+        report_dir = Path(output_dir)
+        report_dir.mkdir(parents=True, exist_ok=True)
+        (report_dir / "row_exclusion_audit.json").write_text(json.dumps({"input_rows":total,"plotted_rows":len(rows),"excluded_rows":total-len(rows),"columns":[x_name,y_name]}),encoding="utf-8")
+    x = numeric(require_column(rows, x_name), x_name)
+    y = numeric(require_column(rows, y_name), y_name)
+    hue_name = str(encoding.get("hue_column", ""))
+    hues = require_column(rows, hue_name) if hue_name else ["数据"] * len(rows)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    for index, group in enumerate(ordered_unique(hues)):
+        mask = np.asarray([value == group for value in hues], dtype=bool)
+        ax.scatter(x[mask], y[mask], s=28, color=plot_color(palette, index), alpha=0.88,
+                   edgecolors=FILL_EDGE, linewidth=0, label=group, zorder=3)
+    ax.set_xlabel(str(encoding.get("x_label", x_name)))
+    ax.set_ylabel(str(encoding.get("y_label", y_name)))
+    ax.set_title(str(encoding.get("title", "")))
+    if len(ordered_unique(hues)) > 1:
+        ax.legend()
+    apply_annotations(ax, encoding)
+    if encoding.get("label_column"):
+        for xx, yy, label in zip(x, y, require_column(rows, encoding["label_column"])):
+            ax.annotate(label, (xx, yy), xytext=(3, 3), textcoords="offset points", fontsize=6)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

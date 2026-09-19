@@ -1,0 +1,98 @@
+{
+  "schema_version": "visual_pattern_library/1.1.0",
+  "design_principle": "Patterns nominate reader questions and alternatives; they never mandate a chart type.",
+  "patterns": [
+    {
+      "id": "pattern_geometry_classification",
+      "source_paper_id": "2025_A_易良禹",
+      "kind": "mechanism_diagram",
+      "visual_form": "2x3 几何分类小倍图",
+      "text_markers": ["分为 6 种情况", "几何约束", "分类讨论"],
+      "minimum_marker_matches": 2,
+      "existing_request_markers": ["几何分类", "六种情况", "空间关系"],
+      "reason": "章节同时出现多分支分类与空间几何约束，纯文字会阻碍读者比较六种位置关系。",
+      "placement_hint": "首次完整列出六种几何情况的段落之后",
+      "ai_prompt_template": "绘制 2 行 3 列的几何示意小倍图。六个子图保持统一坐标、比例、符号和观察视角，每个子图突出一种边界位置关系；不得添加输入证据之外的数值或结论。"
+    },
+    {
+      "id": "pattern_domain_mechanism", "source_paper_id": "cross_case_2025C", "kind": "domain_explanatory_diagram", "visual_role": "domain_explanation",
+      "text_markers": ["问题重述", "检测", "机制", "流程", "指标来源"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["领域示意", "机制示意", "对象关系"],
+      "reason": "若领域机制决定变量含义，读者需要在建模前看到对象、过程与变量来源。", "placement_hint": "问题重述中首次完整说明领域机制之后",
+      "decision_rule": "背景直白或只能生成装饰插画时不画。", "alternatives": ["领域机制示意图", "对象—变量来源图", "结构化文字"],
+      "ai_prompt_template": "研究并绘制证据约束的领域机制示意图，只使用赛题和已核验事实；禁止装饰性场景、虚构数值和未核验机制。"
+    },
+    {
+      "id": "pattern_whole_paper_route", "source_paper_id": "cross_case_2023_2025C", "kind": "paper_workflow", "visual_role": "paper_navigation",
+      "text_markers": ["本文工作", "问题一", "问题二", "问题三"], "minimum_marker_matches": 3,
+      "existing_request_markers": ["总体流程", "技术路线", "全文路线"],
+      "reason": "多问共享数据或传递结果时，需要展示任务—证据—模型—输出的真实依赖。", "placement_hint": "本文工作或问题分析末尾",
+      "decision_rule": "只有数据—模型—结果三个空框时不画。", "alternatives": ["跨问依赖流程图", "任务—证据矩阵", "分点文字"],
+      "ai_prompt_template": "绘制全文路线图，显示各问输入、核心证据、模型、验证与输出的真实依赖；不得添加正文不存在的步骤。"
+    },
+    {
+      "id": "pattern_preprocessing_evidence", "source_paper_id": "2023_C235", "kind": "preprocessing_validation", "visual_role": "preprocessing_evidence",
+      "text_markers": ["数据预处理", "异常值", "缺失值", "清洗", "插补"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["处理前后", "清洗前后", "缺失模式"],
+      "reason": "关键处理会改变分布、样本量或时序信号，需要对照证据。", "placement_hint": "预处理规则说明之后",
+      "decision_rule": "没有同口径处理前后数据时返回证据缺口，不得模拟。", "alternatives": ["处理前后同轴序列", "分布差异", "缺失模式", "统计表"],
+      "ai_prompt_template": "比较处理前后同口径证据，突出被修复结构和被保留信号；若无冻结前后数据则报告缺口。"
+    },
+    {
+      "id": "pattern_relationship_research", "source_paper_id": "cross_case_2023_2025C", "kind": "relationship_analysis", "visual_role": "relationship_evidence",
+      "text_markers": ["相关", "影响因素", "关系", "非线性"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["散点", "响应曲线", "相关矩阵", "时滞相关"],
+      "reason": "关系主张需匹配变量数量、非线性、分组和时间结构，热力图只能承担整体筛查。", "placement_hint": "关系分析结论之前",
+      "decision_rule": "必须比较热力图、散点/平滑、条件效应、分组、时滞或精确表格。", "alternatives": ["聚类相关矩阵", "散点与平滑", "条件效应", "滚动/时滞相关", "系数区间表"],
+      "ai_prompt_template": "先判断一对多、多对多、非线性、分组或时序关系，再选择表达；不得把相关写成因果。"
+    },
+    {
+      "id": "pattern_time_series_diagnostics", "source_paper_id": "cross_case_2023C", "kind": "time_series_diagnostics", "visual_role": "model_validation",
+      "text_markers": ["时间序列", "ARIMA", "季节性", "自相关", "预测"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["ACF", "PACF", "序列分解", "预测对照"],
+      "reason": "时序模型选择和可信度需要趋势、季节、相关结构与样本外误差证据。", "placement_hint": "时序结构识别和预测验证处",
+      "decision_rule": "含日期不等于必须画 ACF/PACF。", "alternatives": ["原始序列", "分解", "ACF/PACF", "预测区间", "误差随时间"],
+      "ai_prompt_template": "围绕时序模型识别、拟合与样本外验证选择互补图，避免重复折线。"
+    },
+    {
+      "id": "pattern_iterative_solver", "source_paper_id": "cross_case_2023_2025C", "kind": "solver_diagnostics", "visual_role": "solver_diagnostics",
+      "text_markers": ["迭代", "遗传算法", "模拟退火", "粒子群", "收敛"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["迭代曲线", "收敛曲线", "搜索轨迹"],
+      "reason": "核心迭代求解应证明搜索过程、停止和稳定性。", "placement_hint": "算法步骤之后、最优结果之前",
+      "decision_rule": "简单确定性求解或收敛与结论无关时不画。", "alternatives": ["收敛曲线", "最优值与界差距", "搜索轨迹", "运行统计表"],
+      "ai_prompt_template": "显示目标值、可行性或最优界随迭代变化，并标出停止条件。"
+    },
+    {
+      "id": "pattern_probabilistic_diagnostics", "source_paper_id": "2023_C126", "kind": "sampling_diagnostics", "visual_role": "model_validation",
+      "text_markers": ["MCMC", "贝叶斯", "后验", "采样"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["轨迹图", "后验密度", "自相关"],
+      "reason": "概率模型可信度依赖采样混合、后验形态和自相关诊断。", "placement_hint": "后验估计结果之前",
+      "decision_rule": "非采样模型不得为了图种丰富套用。", "alternatives": ["链轨迹", "后验密度", "自相关", "R-hat/ESS 区间表"],
+      "ai_prompt_template": "按参数重要性选择链轨迹、后验密度和自相关诊断，避免逐参数重复。"
+    },
+    {
+      "id": "pattern_classification_validation", "source_paper_id": "cross_case_2025C", "kind": "classification_validation", "visual_role": "model_validation",
+      "text_markers": ["分类", "异常判定", "精确率", "召回率", "概率"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["PR 曲线", "校准曲线", "混淆矩阵", "误差分组"],
+      "reason": "分类结论需要选择区分能力、阈值、校准与错误结构中的适用证据。", "placement_hint": "分类性能与阈值选择处",
+      "decision_rule": "不平衡样本不得只报告准确率。", "alternatives": ["PR/ROC", "校准", "混淆矩阵", "阈值权衡", "分组误差"],
+      "ai_prompt_template": "根据样本平衡、概率用途和决策成本选择分类验证组合，明确阈值和基线。"
+    },
+    {
+      "id": "pattern_optimization_tradeoff", "source_paper_id": "cross_case_2023_2025C", "kind": "optimization_tradeoff", "visual_role": "decision_support",
+      "text_markers": ["最优", "目标函数", "阈值", "权衡", "多目标"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["目标曲线", "帕累托", "阈值权衡", "最优邻域"],
+      "reason": "精确最优值之外，读者还需理解最优点附近形态、目标冲突与方案敏感性。", "placement_hint": "最优方案表前后",
+      "decision_rule": "只有冻结候选解或目标扫描结果时绘制，不得凭单点插值。", "alternatives": ["目标—决策曲线", "帕累托前沿", "阈值权衡", "候选方案区间图"],
+      "ai_prompt_template": "展示最优点、邻域和约束/权衡；精确方案值仍交给表格。"
+    },
+    {
+      "id": "pattern_robustness_boundary", "source_paper_id": "cross_case_2023_2025C", "kind": "robustness_visualization", "visual_role": "robustness_boundary",
+      "text_markers": ["敏感性", "稳健性", "不确定性", "置信区间", "扰动"], "minimum_marker_matches": 2,
+      "existing_request_markers": ["敏感性曲线", "不确定区间", "情景对照"],
+      "reason": "核心结论应说明对参数、样本或情景扰动的稳定范围。", "placement_hint": "模型检验或评价之前",
+      "decision_rule": "没有真实扰动结果不得伪造敏感性图。", "alternatives": ["单因素响应", "双因素矩阵", "区间图", "情景小多图"],
+      "ai_prompt_template": "绑定冻结扰动方案与评价口径，展示稳定区间和失效边界。"
+    }
+  ]
+}

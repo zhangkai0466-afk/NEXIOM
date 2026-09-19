@@ -1,0 +1,155 @@
+.boot-overlay,
+.boot-preview {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  background: var(--boot-background, #000);
+  color: var(--boot-foreground, #fff);
+  color-scheme: inherit;
+}
+
+.boot-overlay {
+  z-index: 10000;
+  opacity: 1;
+  transition: opacity 420ms cubic-bezier(.4, 0, .2, 1);
+}
+
+.boot-overlay.boot-exit {
+  opacity: 0;
+}
+
+.boot-waiting .boot-brand * {
+  animation-play-state: paused !important;
+}
+
+.boot-drag-region {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 36px;
+  -webkit-app-region: drag;
+}
+
+.boot-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.boot-brand {
+  display: block;
+  width: min(560px, calc(100vw - 32px));
+  height: auto;
+  overflow: visible;
+}
+
+.boot-trace {
+  fill: none;
+  stroke: #fff;
+  stroke-width: 18;
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 0;
+  animation: boot-draw 1250ms cubic-bezier(.45, 0, .2, 1) 160ms both;
+}
+
+.boot-symbol {
+  transform: translateX(-166px);
+  animation: boot-move 850ms cubic-bezier(.65, 0, .18, 1) 1430ms both;
+}
+
+.boot-symbol-cover {
+  fill: var(--boot-background, #000);
+}
+
+.boot-word-curtain {
+  transform-origin: 168px 80px;
+  animation: boot-reveal 750ms cubic-bezier(.4, 0, .15, 1) 1750ms both;
+}
+
+.boot-letter {
+  animation: boot-letter 620ms cubic-bezier(.2, .65, .2, 1) calc(1760ms + var(--letter) * 65ms) both;
+}
+
+.boot-letter text {
+  fill: currentColor;
+  font-family: "Segoe UI Variable Display", "Segoe UI", Arial, sans-serif;
+  font-size: 3.25rem;
+  font-weight: 400;
+}
+
+@keyframes boot-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+
+@keyframes boot-move {
+  from { transform: translateX(0); }
+  to { transform: translateX(-166px); }
+}
+
+@keyframes boot-reveal {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes boot-letter {
+  from { opacity: 0; transform: translateX(-48px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.boot-preview-controls {
+  position: absolute;
+  inset: auto 40px 30px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #777;
+  font: 0.875rem/1.5 "Segoe UI", "Microsoft YaHei UI", sans-serif;
+  letter-spacing: 0;
+}
+
+.boot-preview-controls > span {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.boot-preview-controls i {
+  width: 2px;
+  height: 2px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.boot-preview-controls button {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, currentColor 26%, transparent);
+  border-radius: 6px;
+  color: color-mix(in srgb, var(--boot-foreground, #fff) 68%, transparent);
+  background: var(--boot-background, #000);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+.boot-preview-controls button:hover {
+  color: var(--boot-foreground, #fff);
+  border-color: currentColor;
+}
+
+.boot-preview-controls button:focus-visible {
+  outline: 1px solid var(--boot-foreground, #fff);
+  outline-offset: 4px;
+}
+
+.boot-brand-still * {
+  animation: none !important;
+}
+
+@media (max-width: 480px) {
+  .boot-preview-controls { inset: auto 24px 24px; }
+}

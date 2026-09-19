@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">NEXIOM geometric N application icon</title>
+  <desc id="desc">A minimal white N built from two forward-slanted pillars and one diagonal bridge on a black rounded square.</desc>
+  <rect width="1024" height="1024" rx="184" fill="#050505"/>
+  <g fill="#FFFFFF">
+    <path d="M310 776h-88l94-528h88z"/>
+    <path d="M698 776h-88l94-528h88z"/>
+    <path d="M322 340l72-50 290 394-64 50z"/>
+  </g>
+</svg>

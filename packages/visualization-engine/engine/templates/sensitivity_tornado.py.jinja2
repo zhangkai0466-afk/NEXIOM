@@ -1,0 +1,29 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    parameter_name = encoding["parameter_column"]
+    labels = require_column(rows, parameter_name)
+    low = numeric(require_column(rows, encoding["low_column"]), encoding["low_column"])
+    high = numeric(require_column(rows, encoding["high_column"]), encoding["high_column"])
+    baseline_name = str(encoding.get("baseline_column", ""))
+    baseline = numeric(require_column(rows, baseline_name), baseline_name) if baseline_name else np.zeros(len(rows))
+    order = np.argsort(np.maximum(np.abs(low - baseline), np.abs(high - baseline)))
+    y = np.arange(len(rows))
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    ax.barh(y, low[order] - baseline[order], left=baseline[order], color=bar_face_color(palette, 0),
+            edgecolor=bar_edge_color(palette, 0), linewidth=0.9, label="低值情景", zorder=3)
+    ax.barh(y, high[order] - baseline[order], left=baseline[order], color=bar_face_color(palette, palette.count-1),
+            edgecolor=bar_edge_color(palette, palette.count-1), linewidth=0.9, label="高值情景", zorder=3)
+    ax.set_yticks(y, [labels[index] for index in order])
+    ax.set_xlabel(str(encoding.get("x_label", "响应变化")))
+    ax.set_title(str(encoding.get("title", "参数灵敏度")))
+    ax.legend()
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

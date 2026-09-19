@@ -1,0 +1,1201 @@
+{
+  "version": "1.7.1",
+  "tools": [
+    {
+      "name": "run_visual_stage_unit",
+      "description": "赛前入口：每次执行一个小研究单元，两层自动隔离；重复输入可复用模型检查点。第二层只强制要求框架。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inventory_path": {
+            "title": "Inventory Path",
+            "type": "string"
+          },
+          "output_root": {
+            "title": "Output Root",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "unit_id": {
+            "title": "Unit Id",
+            "type": "string"
+          },
+          "research_question": {
+            "title": "Research Question",
+            "type": "string"
+          },
+          "section_context": {
+            "default": "",
+            "title": "Section Context",
+            "type": "string"
+          },
+          "previous_plan_path": {
+            "default": "",
+            "title": "Previous Plan Path",
+            "type": "string"
+          },
+          "render": {
+            "default": true,
+            "title": "Render",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "inventory_path",
+          "output_root",
+          "stage",
+          "unit_id",
+          "research_question"
+        ],
+        "title": "run_visual_stage_unitArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "visual_stage_report",
+      "description": "不调用模型：汇总独立层的候选与已渲染图，报告未完成单元、证据缺口和正文图量不足。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "output_root": {
+            "title": "Output Root",
+            "type": "string"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "output_root",
+          "stage"
+        ],
+        "title": "visual_stage_reportArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "get_visual_research_cards",
+      "description": "分批读取图形作用、证据要求、准备步骤、替代画法与不能证明的结论。返回next_offset和全类别统计。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "family": {
+            "default": "",
+            "title": "Family",
+            "type": "string"
+          },
+          "offset": {
+            "default": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 12,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "get_visual_research_cardsArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "discover_visual_research_project",
+      "description": "阶段1：索引授权项目的数据、方案与代码，不要求预制绘图CSV、不执行现有代码。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project_root": {
+            "title": "Project Root",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "max_files": {
+            "default": 3000,
+            "title": "Max Files",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "project_root",
+          "output_dir"
+        ],
+        "title": "discover_visual_research_projectArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "search_visual_research_sources",
+      "description": "按研究名词、路径或列名检索项目来源，分页返回source_id；kind为table/document/code，未读资料不作结论。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inventory_path": {
+            "title": "Inventory Path",
+            "type": "string"
+          },
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "offset": {
+            "default": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 20,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inventory_path"
+        ],
+        "title": "search_visual_research_sourcesArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "read_visual_research_source",
+      "description": "阶段2：按稳定source_id核验哈希后分页阅读资料；PDF/Excel等明确要求提取，不假装已经读懂。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inventory_path": {
+            "title": "Inventory Path",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "offset": {
+            "default": 0,
+            "title": "Offset",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 8000,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inventory_path",
+          "source_id"
+        ],
+        "title": "read_visual_research_sourceArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "run_visual_research_unit",
+      "description": "阶段3：配置模型每次研究一个问题、最多4份资料与8张用途卡，输出反证、分析任务、待查来源和实验移交。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inventory_path": {
+            "title": "Inventory Path",
+            "type": "string"
+          },
+          "question": {
+            "title": "Question",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Source Ids",
+            "type": "array"
+          },
+          "family": {
+            "title": "Family",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "card_offset": {
+            "default": 0,
+            "title": "Card Offset",
+            "type": "integer"
+          },
+          "source_offset": {
+            "default": 0,
+            "title": "Source Offset",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "inventory_path",
+          "question",
+          "source_ids",
+          "family",
+          "output_dir"
+        ],
+        "title": "run_visual_research_unitArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "execute_visual_research_tasks",
+      "description": "阶段4：本地确定性计算缺失、分组描述、相关及连续响应预测诊断；新增实验交本地Codex审查，禁止任意代码。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "plan_path": {
+            "title": "Plan Path",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_path",
+          "output_dir"
+        ],
+        "title": "execute_visual_research_tasksArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "prepare_researched_visual_inventory",
+      "description": "阶段5：核验新计算证据与来源哈希，交给exploration/refinement选图绘图；保留未完成实验清单。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "execution_path": {
+            "title": "Execution Path",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          }
+        },
+        "required": [
+          "execution_path",
+          "output_dir"
+        ],
+        "title": "prepare_researched_visual_inventoryArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "visual_research_progress",
+      "description": "阶段进度：区分已读/未读图形卡、过期研究单元、待查资料与外部实验；禁止把一页研究称为地毯式完成。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inventory_path": {
+            "title": "Inventory Path",
+            "type": "string"
+          },
+          "research_dir": {
+            "title": "Research Dir",
+            "type": "string"
+          }
+        },
+        "required": [
+          "inventory_path",
+          "research_dir"
+        ],
+        "title": "visual_research_progressArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "build_evidence_visual_inventory",
+      "description": "撰写前入口：输入CSV/TSV证据与MD/TXT/JSON研究资料，建立完整名词/模板/证据快照。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "data_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Files",
+            "type": "array"
+          },
+          "context_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Context Files",
+            "type": "array"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          }
+        },
+        "required": [
+          "data_files",
+          "context_files",
+          "output_dir"
+        ],
+        "title": "build_evidence_visual_inventoryArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "run_evidence_visual_pipeline",
+      "description": "双阶段设计：exploration探索证据；refinement结合章节和前期清单补图选图。返回图像及待核验叙事建议。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "inventory_path": {
+            "title": "Inventory Path",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "stage": {
+            "default": "exploration",
+            "title": "Stage",
+            "type": "string"
+          },
+          "section_context": {
+            "default": "",
+            "title": "Section Context",
+            "type": "string"
+          },
+          "previous_plan_path": {
+            "default": "",
+            "title": "Previous Plan Path",
+            "type": "string"
+          },
+          "render": {
+            "default": true,
+            "title": "Render",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "inventory_path",
+          "output_dir"
+        ],
+        "title": "run_evidence_visual_pipelineArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "health_check",
+      "description": "health_check",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "health_checkArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "create_visual_design_run",
+      "description": "create_visual_design_run",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "run_name": {
+            "default": "visual_design",
+            "title": "Run Name",
+            "type": "string"
+          }
+        },
+        "title": "create_visual_design_runArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "preflight_visual_design_inputs",
+      "description": "preflight_visual_design_inputs",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_requests": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Visual Requests",
+            "type": "array"
+          },
+          "data_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Files",
+            "type": "array"
+          },
+          "section_context": {
+            "title": "Section Context",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "data_file_by_request": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Data File By Request"
+          }
+        },
+        "required": [
+          "visual_requests",
+          "data_files",
+          "section_context",
+          "output_dir"
+        ],
+        "title": "preflight_visual_design_inputsArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "analyze_data_file",
+      "description": "analyze_data_file",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "data_file": {
+            "title": "Data File",
+            "type": "string"
+          },
+          "sample_rows": {
+            "default": 5,
+            "title": "Sample Rows",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "data_file"
+        ],
+        "title": "analyze_data_fileArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "build_visual_design_packet",
+      "description": "build_visual_design_packet",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_requests": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Visual Requests",
+            "type": "array"
+          },
+          "data_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Files",
+            "type": "array"
+          },
+          "section_context": {
+            "title": "Section Context",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "data_file_by_request": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Data File By Request"
+          }
+        },
+        "required": [
+          "visual_requests",
+          "data_files",
+          "section_context",
+          "output_dir"
+        ],
+        "title": "build_visual_design_packetArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "run_visual_design_meeting",
+      "description": "run_visual_design_meeting",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_requests": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Visual Requests",
+            "type": "array"
+          },
+          "data_files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Data Files",
+            "type": "array"
+          },
+          "section_context": {
+            "title": "Section Context",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "data_file_by_request": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Data File By Request"
+          },
+          "use_mock_models": {
+            "default": false,
+            "title": "Use Mock Models",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "visual_requests",
+          "data_files",
+          "section_context",
+          "output_dir"
+        ],
+        "title": "run_visual_design_meetingArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "build_paper_visual_inventory",
+      "description": "Read a full LaTeX paper while removing existing visual forms, and inventory frozen figure data.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "paper_root": {
+            "title": "Paper Root",
+            "type": "string"
+          },
+          "data_dir": {
+            "title": "Data Dir",
+            "type": "string"
+          },
+          "entry_tex": {
+            "default": "",
+            "title": "Entry Tex",
+            "type": "string"
+          }
+        },
+        "required": [
+          "paper_root",
+          "data_dir"
+        ],
+        "title": "build_paper_visual_inventoryArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "run_paper_visualization_pipeline",
+      "description": "Plan, generate, render and gate a complete paper-level visualization set.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "paper_root": {
+            "title": "Paper Root",
+            "type": "string"
+          },
+          "data_dir": {
+            "title": "Data Dir",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "entry_tex": {
+            "default": "",
+            "title": "Entry Tex",
+            "type": "string"
+          }
+        },
+        "required": [
+          "paper_root",
+          "data_dir",
+          "output_dir"
+        ],
+        "title": "run_paper_visualization_pipelineArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "execute_saved_paper_visual_plan",
+      "description": "Re-run local semantic gates and rendering from a saved plan, with zero additional model calls.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "plan_path": {
+            "title": "Plan Path",
+            "type": "string"
+          },
+          "paper_root": {
+            "title": "Paper Root",
+            "type": "string"
+          },
+          "data_dir": {
+            "title": "Data Dir",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "entry_tex": {
+            "default": "",
+            "title": "Entry Tex",
+            "type": "string"
+          }
+        },
+        "required": [
+          "plan_path",
+          "paper_root",
+          "data_dir",
+          "output_dir"
+        ],
+        "title": "execute_saved_paper_visual_planArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "render_and_inspect_visual_design",
+      "description": "render_and_inspect_visual_design",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_design_output_json": {
+            "title": "Visual Design Output Json",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_design_output_json",
+          "output_dir"
+        ],
+        "title": "render_and_inspect_visual_designArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "check_request_fulfillment",
+      "description": "check_request_fulfillment",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_request": {
+            "additionalProperties": true,
+            "title": "Visual Request",
+            "type": "object"
+          },
+          "encoding_requirements": {
+            "additionalProperties": true,
+            "title": "Encoding Requirements",
+            "type": "object"
+          }
+        },
+        "required": [
+          "visual_request",
+          "encoding_requirements"
+        ],
+        "title": "check_request_fulfillmentArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "validate_visual_design_output",
+      "description": "validate_visual_design_output",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_design_output_json": {
+            "title": "Visual Design Output Json",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_design_output_json"
+        ],
+        "title": "validate_visual_design_outputArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "detect_missing_figures",
+      "description": "detect_missing_figures",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "section_context": {
+            "title": "Section Context",
+            "type": "string"
+          },
+          "visual_requests": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Visual Requests",
+            "type": "array"
+          }
+        },
+        "required": [
+          "section_context",
+          "visual_requests"
+        ],
+        "title": "detect_missing_figuresArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "generate_principle_figure_prompt",
+      "description": "generate_principle_figure_prompt",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_request": {
+            "additionalProperties": true,
+            "title": "Visual Request",
+            "type": "object"
+          },
+          "section_context": {
+            "title": "Section Context",
+            "type": "string"
+          },
+          "visual_form": {
+            "default": "",
+            "title": "Visual Form",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_request",
+          "section_context"
+        ],
+        "title": "generate_principle_figure_promptArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "check_code_quality",
+      "description": "check_code_quality",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "python_code": {
+            "default": "",
+            "title": "Python Code",
+            "type": "string"
+          },
+          "python_code_path": {
+            "default": "",
+            "title": "Python Code Path",
+            "type": "string"
+          },
+          "caption_intent": {
+            "default": "",
+            "title": "Caption Intent",
+            "type": "string"
+          },
+          "required_annotations": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Required Annotations"
+          }
+        },
+        "title": "check_code_qualityArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "list_available_templates",
+      "description": "list_available_templates",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "list_available_templatesArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "list_visual_grammar_index",
+      "description": "Summarize executable templates plus the larger chart-name discovery vocabulary.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "list_visual_grammar_indexArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "search_visual_grammar_terms",
+      "description": "Find a chart even when the caller only knows a Chinese/English fragment or its intended reader question.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "query": {
+            "default": "",
+            "title": "Query",
+            "type": "string"
+          },
+          "limit": {
+            "default": 20,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "executable_only": {
+            "default": false,
+            "title": "Executable Only",
+            "type": "boolean"
+          }
+        },
+        "title": "search_visual_grammar_termsArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "search_visual_templates",
+      "description": "Search executable registered templates against one request and one analyzed data file.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "visual_request": {
+            "additionalProperties": true,
+            "title": "Visual Request",
+            "type": "object"
+          },
+          "data_file": {
+            "title": "Data File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "visual_request",
+          "data_file"
+        ],
+        "title": "search_visual_templatesArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "list_available_palettes",
+      "description": "list_available_palettes",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {},
+        "title": "list_available_palettesArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "render_preview",
+      "description": "render_preview",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "palette_id": {
+            "title": "Palette Id",
+            "type": "string"
+          },
+          "chart_id": {
+            "title": "Chart Id",
+            "type": "string"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "color_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Color Indices"
+          },
+          "extension_indices": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Extension Indices"
+          },
+          "output_formats": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Output Formats"
+          },
+          "dpi": {
+            "default": 300,
+            "title": "Dpi",
+            "type": "integer"
+          },
+          "width": {
+            "default": 6.4,
+            "title": "Width",
+            "type": "number"
+          },
+          "height": {
+            "default": 4.0,
+            "title": "Height",
+            "type": "number"
+          }
+        },
+        "required": [
+          "palette_id",
+          "chart_id",
+          "output_dir"
+        ],
+        "title": "render_previewArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "update_visual_request_fields",
+      "description": "update_visual_request_fields",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "section_content_package_json": {
+            "title": "Section Content Package Json",
+            "type": "string"
+          },
+          "visual_design_output_json": {
+            "title": "Visual Design Output Json",
+            "type": "string"
+          },
+          "output_path": {
+            "title": "Output Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "section_content_package_json",
+          "visual_design_output_json",
+          "output_path"
+        ],
+        "title": "update_visual_request_fieldsArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    },
+    {
+      "name": "get_visual_reference",
+      "description": "读取内置图库参考图的真实图像与适用条件。返回科研截图或模板预览，不把预览中的数值当作项目证据。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "reference_id": {
+            "title": "Reference Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reference_id"
+        ],
+        "title": "get_visual_referenceArguments",
+        "type": "object"
+      },
+      "readOnly": true
+    },
+    {
+      "name": "render_visual_template",
+      "description": "从当前项目真实 CSV/TSV 生成单张科研图的 PDF、PNG、SVG。先检验指定模板的数据列、类型与统计证据前提；不调用云模型。",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "template_id": {
+            "title": "Template Id",
+            "type": "string"
+          },
+          "palette_id": {
+            "title": "Palette Id",
+            "type": "string"
+          },
+          "data_file": {
+            "title": "Data File",
+            "type": "string"
+          },
+          "encoding": {
+            "additionalProperties": true,
+            "title": "Encoding",
+            "type": "object"
+          },
+          "output_dir": {
+            "title": "Output Dir",
+            "type": "string"
+          },
+          "dpi": {
+            "default": 300,
+            "title": "Dpi",
+            "type": "integer"
+          },
+          "width": {
+            "default": 6.4,
+            "title": "Width",
+            "type": "number"
+          },
+          "height": {
+            "default": 4.0,
+            "title": "Height",
+            "type": "number"
+          },
+          "evidence_facts": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Evidence Facts"
+          }
+        },
+        "required": [
+          "template_id",
+          "palette_id",
+          "data_file",
+          "encoding",
+          "output_dir"
+        ],
+        "title": "render_visual_templateArguments",
+        "type": "object"
+      },
+      "readOnly": false
+    }
+  ]
+}

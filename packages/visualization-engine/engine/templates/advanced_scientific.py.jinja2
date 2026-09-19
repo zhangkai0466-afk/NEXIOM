@@ -1,0 +1,261 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def _columns(rows, encoding, roles):
+    return {role: require_column(rows, encoding[role]) for role in roles}
+
+
+def _style_all(fig, palette):
+    for axis in fig.axes:
+        if axis.get_label() != "<colorbar>":
+            style_axis(axis, palette)
+
+
+def _jitter(count, width=0.14):
+    if count <= 1:
+        return np.zeros(count)
+    return np.linspace(-width, width, count)
+
+
+def _kde(values, grid):
+    values = np.asarray(values, dtype=float)
+    spread = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
+    bandwidth = max(spread * max(len(values), 2) ** (-0.2), max(float(np.ptp(values)), 1.0) * 0.035, 1e-9)
+    density = np.exp(-0.5 * ((grid[:, None] - values[None, :]) / bandwidth) ** 2).mean(axis=1)
+    return density / max(float(density.max()), 1e-12)
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+
+    if TEMPLATE_ID == "binned_density_calibration":
+        plt.close(fig)
+        observed = numeric(require_column(rows, encoding["observed_column"]), encoding["observed_column"])
+        predicted = numeric(require_column(rows, encoding["predicted_column"]), encoding["predicted_column"])
+        response_name = str(encoding.get("response_column", ""))
+        responses = ordered_unique(require_column(rows, response_name)) if response_name else ["预测校准"]
+        panel_columns = len(responses) if len(responses) <= 3 else max(2, int(np.ceil(np.sqrt(len(responses))))); panel_rows = int(np.ceil(len(responses) / panel_columns))
+        fig, axes = plt.subplots(panel_rows, panel_columns, figsize=(4.6 * panel_columns, 3.8 * panel_rows), squeeze=False)
+        fig.patch.set_facecolor(palette.background)
+        cmap = LinearSegmentedColormap.from_list("density", [palette.background, *palette.hex_colors[:4]])
+        response_values = require_column(rows, response_name) if response_name else [responses[0]] * len(rows)
+        for axis, response in zip(axes.flat, responses):
+            axis.set_facecolor(palette.background); apply_axis_layer(axis, encoding)
+            mask = np.asarray([item == response for item in response_values], dtype=bool)
+            x, y = observed[mask], predicted[mask]
+            lo, hi = float(min(x.min(), y.min())), float(max(x.max(), y.max()))
+            bins = min(24, max(8, int(np.sqrt(len(x)))))
+            counts, xedges, yedges = np.histogram2d(x, y, bins=bins)
+            visible = np.ma.masked_where(counts.T == 0, counts.T)
+            axis.pcolormesh(xedges, yedges, visible, cmap=cmap, shading="flat", zorder=3)
+            axis.axline((lo, lo), (hi, hi), color="#858585", linestyle="--", linewidth=1.0, zorder=1, label="1:1 line")
+            slope, intercept = np.polyfit(x, y, 1)
+            fit_x = np.asarray([lo, hi]); axis.plot(fit_x, slope * fit_x + intercept, color="#181818", linewidth=1.35, zorder=4, label="Fitted line")
+            residual = y - x
+            r2 = float(1 - np.sum(residual ** 2) / np.sum((x - x.mean()) ** 2)) if len(x) > 1 and np.std(x) > 0 else float("nan")
+            metrics = f"n={len(x)}\n$R^2$={r2:.2f}\nRMSE={np.sqrt(np.mean(residual ** 2)):.2f}\nMAE={np.mean(np.abs(residual)):.2f}"
+            axis.text(0.04, 0.94, metrics, transform=axis.transAxes, va="top", color=palette.ink, fontsize=8.8, zorder=5)
+            axis.text(0.96, 0.94, str(response), transform=axis.transAxes, ha="right", va="top", color="white", fontsize=9.2, fontweight="bold", bbox={"facecolor":"#111111","edgecolor":"none","pad":3.2}, zorder=5)
+            axis.set_xlabel(str(encoding.get("x_label", encoding["observed_column"]))); axis.set_ylabel(str(encoding.get("y_label", encoding["predicted_column"])))
+            axis.legend(loc="lower right", frameon=False, fontsize=8); style_axis(axis, palette)
+        for axis in list(axes.flat)[len(responses):]:
+            axis.axis("off")
+        fig.suptitle(str(encoding.get("title", "")))
+
+    elif TEMPLATE_ID == "joint_scatter_marginals":
+        plt.close(fig)
+        from matplotlib.gridspec import GridSpec
+        fig = plt.figure(figsize=tuple(CONFIG["figsize"]), facecolor=palette.background)
+        setattr(fig, "_skip_tight_layout", True); fig.subplots_adjust(left=0.12, right=0.94, bottom=0.14, top=0.92)
+        grid = GridSpec(4, 4, figure=fig, hspace=0.05, wspace=0.05)
+        main = fig.add_subplot(grid[1:, :3]); top = fig.add_subplot(grid[0, :3], sharex=main); right = fig.add_subplot(grid[1:, 3], sharey=main)
+        for axis in (main, top, right): axis.set_facecolor(palette.background); apply_axis_layer(axis, encoding)
+        x = numeric(require_column(rows, encoding["x_column"]), encoding["x_column"]); y = numeric(require_column(rows, encoding["y_column"]), encoding["y_column"])
+        main.scatter(x, y, s=24, color=palette.hex_colors[0], alpha=0.72, edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+        top.hist(x, bins=min(24, max(6, int(np.sqrt(len(x))))), color=palette.hex_colors[0], alpha=0.72, edgecolor=FILL_EDGE, linewidth=0, zorder=3)
+        right.hist(y, bins=min(24, max(6, int(np.sqrt(len(y))))), orientation="horizontal", color=palette.hex_colors[1 % palette.count], alpha=0.72, edgecolor=FILL_EDGE, linewidth=0, zorder=3)
+        main.set_xlabel(str(encoding.get("x_label", encoding["x_column"]))); main.set_ylabel(str(encoding.get("y_label", encoding["y_column"])))
+        top.tick_params(labelbottom=False); right.tick_params(labelleft=False); top.set_ylabel("频数"); right.set_xlabel("频数")
+        main.set_title(str(encoding.get("title", ""))); _style_all(fig, palette)
+
+    elif TEMPLATE_ID == "raincloud_paired":
+        categories = ordered_unique(require_column(rows, encoding["category_column"])); values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        raw_categories = require_column(rows, encoding["category_column"])
+        for index, category in enumerate(categories):
+            sample = values[np.asarray([item == category for item in raw_categories])]
+            violin = ax.violinplot(sample, positions=[index - 0.16], widths=0.48, showextrema=False)
+            for body in violin["bodies"]:
+                body.set_facecolor(plot_color(palette, index)); body.set_edgecolor("none"); body.set_alpha(0.35); body.set_zorder(2)
+            ax.boxplot(sample, positions=[index], widths=0.16, patch_artist=True, showfliers=False, boxprops={"facecolor":mix_color(plot_color(palette, index), palette.background, 0.30),"edgecolor":plot_color(palette, index)}, medianprops={"color":"#202124"}, whiskerprops={"color":"#777777"}, capprops={"color":"#777777"}, zorder=3)
+            ax.scatter(index + 0.18 + _jitter(len(sample), 0.10), sample, s=18, color=plot_color(palette, index), alpha=0.72, edgecolors=FILL_EDGE, linewidth=0, zorder=4)
+        pair_name = str(encoding.get("pair_column", ""))
+        if pair_name:
+            pairs = require_column(rows, pair_name)
+            for pair in ordered_unique(pairs):
+                positions, paired_values = [], []
+                for index, category in enumerate(categories):
+                    hit = [j for j, item in enumerate(pairs) if item == pair and raw_categories[j] == category]
+                    if hit: positions.append(index); paired_values.append(values[hit[0]])
+                if len(positions) >= 2: ax.plot(positions, paired_values, color="#A9AAAD", alpha=0.35, linewidth=0.7, zorder=2)
+        ax.set_xticks(np.arange(len(categories)), categories); ax.set_ylabel(str(encoding.get("y_label", encoding["value_column"])))
+        ax.set_title(str(encoding.get("title", ""))); apply_annotations(ax, encoding); style_axis(ax, palette)
+
+    elif TEMPLATE_ID == "grouped_bar_points_interval":
+        categories = ordered_unique(require_column(rows, encoding["category_column"])); raw_categories = require_column(rows, encoding["category_column"])
+        values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"]); group_name = str(encoding.get("group_column", ""))
+        raw_groups = require_column(rows, group_name) if group_name else ["汇总"] * len(rows); groups = ordered_unique(raw_groups)
+        width = 0.74 / len(groups)
+        for group_index, group in enumerate(groups):
+            centers, means, sems = [], [], []
+            for category_index, category in enumerate(categories):
+                mask = np.asarray([c == category and g == group for c, g in zip(raw_categories, raw_groups)])
+                sample = values[mask]
+                center = category_index + (group_index - (len(groups)-1)/2) * width
+                centers.append(center); means.append(float(sample.mean())); sems.append(float(sample.std(ddof=1) / np.sqrt(len(sample))) if len(sample) > 1 else 0.0)
+                ax.scatter(center + _jitter(len(sample), width * 0.22), sample, s=16, color=palette.hex_colors[group_index % palette.count], alpha=0.66, edgecolors=FILL_EDGE, linewidth=0, zorder=4)
+            color = palette.hex_colors[group_index % palette.count]
+            ax.bar(centers, means, width=width*0.88, color=bar_face_color(palette, group_index), alpha=0.96, edgecolor=bar_edge_color(palette, group_index), linewidth=0.9, zorder=2, label=group)
+            ax.errorbar(centers, means, yerr=sems, fmt="none", ecolor=palette.hex_colors[group_index % palette.count], capsize=3, linewidth=1.0, zorder=3)
+        ax.set_xticks(np.arange(len(categories)), categories); ax.set_ylabel(str(encoding.get("y_label", encoding["value_column"])))
+        if len(groups) > 1: ax.legend(frameon=False)
+        ax.set_title(str(encoding.get("title", ""))); style_axis(ax, palette)
+
+    elif TEMPLATE_ID == "correlation_vif_panel":
+        plt.close(fig)
+        from matplotlib.gridspec import GridSpec
+        fig = plt.figure(figsize=tuple(CONFIG["figsize"]), facecolor=palette.background); grid = GridSpec(1, 4, figure=fig, wspace=0.12)
+        setattr(fig, "_skip_tight_layout", True); fig.subplots_adjust(left=0.14, right=0.93, bottom=0.16, top=0.90)
+        matrix_ax = fig.add_subplot(grid[:, :3]); vif_ax = fig.add_subplot(grid[:, 3]); apply_axis_layer(matrix_ax, encoding); apply_axis_layer(vif_ax, encoding)
+        row_values, column_values = require_column(rows, encoding["row_column"]), require_column(rows, encoding["column_column"])
+        row_labels, column_labels = ordered_unique(row_values), ordered_unique(column_values); values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        matrix = np.full((len(row_labels), len(column_labels)), np.nan)
+        for row_name, column_name, value in zip(row_values, column_values, values): matrix[row_labels.index(row_name), column_labels.index(column_name)] = value
+        cmap = LinearSegmentedColormap.from_list("corr", [palette.hex_colors[0], palette.background, palette.hex_colors[1 % palette.count]])
+        image = matrix_ax.imshow(matrix, vmin=-1, vmax=1, cmap=cmap, aspect="auto", zorder=3)
+        matrix_ax.set_xticks(np.arange(len(column_labels)), column_labels); matrix_ax.set_yticks(np.arange(len(row_labels)), row_labels)
+        add_borderless_colorbar(fig, image, ax=matrix_ax, fraction=0.05, pad=0.03, label="相关系数")
+        vif_raw = numeric(require_column(rows, encoding["vif_column"]), encoding["vif_column"])
+        vif_values = [float(np.nanmax([v for v, r in zip(vif_raw, row_values) if r == label])) for label in row_labels]
+        vif_ax.barh(np.arange(len(row_labels)), vif_values, color=bar_face_color(palette, 1), alpha=0.96, edgecolor=bar_edge_color(palette, 1), linewidth=0.9, zorder=3)
+        vif_ax.set_yticks(np.arange(len(row_labels)), [""] * len(row_labels)); vif_ax.set_xlabel("VIF"); matrix_ax.set_title(str(encoding.get("title", ""))); _style_all(fig, palette)
+
+    elif TEMPLATE_ID == "partial_correlation_bubble_matrix":
+        row_values, column_values = require_column(rows, encoding["row_column"]), require_column(rows, encoding["column_column"])
+        row_labels, column_labels = ordered_unique(row_values), ordered_unique(column_values); values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        xs = np.asarray([column_labels.index(item) for item in column_values]); ys = np.asarray([row_labels.index(item) for item in row_values])
+        colors = [palette.hex_colors[1 % palette.count] if value >= 0 else palette.hex_colors[0] for value in values]
+        ax.scatter(xs, ys, s=40 + 620 * np.abs(values), color=colors, alpha=0.78, edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+        p_name = str(encoding.get("pvalue_column", ""))
+        if p_name:
+            pvalues = numeric(require_column(rows, p_name), p_name)
+            for x, y, pvalue in zip(xs, ys, pvalues):
+                if pvalue < 0.05: ax.text(x, y, "*" if pvalue >= 0.01 else "**", ha="center", va="center", fontsize=7.5, color="white", zorder=5)
+        ax.set_xticks(np.arange(len(column_labels)), column_labels); ax.set_yticks(np.arange(len(row_labels)), row_labels); ax.invert_yaxis()
+        ax.set_title(str(encoding.get("title", ""))); style_axis(ax, palette)
+
+    elif TEMPLATE_ID in {"forest_table", "roc_auc_table"}:
+        plt.close(fig)
+        from matplotlib.gridspec import GridSpec
+        fig = plt.figure(figsize=tuple(CONFIG["figsize"]), facecolor=palette.background); grid = GridSpec(1, 5, figure=fig, wspace=0.05)
+        setattr(fig, "_skip_tight_layout", True); fig.subplots_adjust(left=0.17, right=0.97, bottom=0.16, top=0.90)
+        plot_ax = fig.add_subplot(grid[:, :3]); table_ax = fig.add_subplot(grid[:, 3:]); apply_axis_layer(plot_ax, encoding); apply_axis_layer(table_ax, encoding)
+        if TEMPLATE_ID == "forest_table":
+            categories = require_column(rows, encoding["category_column"]); estimate = numeric(require_column(rows, encoding["estimate_column"]), encoding["estimate_column"])
+            lower = numeric(require_column(rows, encoding["lower_column"]), encoding["lower_column"]); upper = numeric(require_column(rows, encoding["upper_column"]), encoding["upper_column"]); y = np.arange(len(categories))
+            plot_ax.errorbar(estimate, y, xerr=np.vstack([estimate-lower, upper-estimate]), fmt="o", color=palette.hex_colors[0], ecolor=palette.hex_colors[0], capsize=3, zorder=3)
+            plot_ax.axvline(float(encoding.get("null_value", 0.0)), color="#858585", linestyle="--", linewidth=0.9, zorder=1)
+            plot_ax.set_yticks(y, categories); plot_ax.invert_yaxis(); plot_ax.set_xlabel(str(encoding.get("x_label", "估计值（区间）")))
+            cells = [[f"{e:.3g}", f"[{lo:.3g}, {hi:.3g}]"] for e, lo, hi in zip(estimate, lower, upper)]
+            extra = [c for c in encoding.get("table_columns", []) if c not in {encoding["estimate_column"],encoding["lower_column"],encoding["upper_column"]}]
+            def display_cell(value):
+                try: return f"{float(value):.3g}"
+                except (ValueError, TypeError): return str(value)
+            for cell, row in zip(cells, rows):
+                cell.extend(display_cell(row[c]) for c in extra)
+            fig.set_size_inches(max(float(CONFIG["figsize"][0]), 10.5), max(float(CONFIG["figsize"][1]), 4.5))
+            plot_ax.set_ylim(len(categories) - .5, -1.5)
+            table = table_ax.table(cellText=cells, colLabels=["估计值", "区间", *extra], bbox=[0, 0, 1, 1], cellLoc="center", edges="open", zorder=3)
+            table.auto_set_font_size(False); table.set_fontsize(7); table.auto_set_column_width(list(range(2 + len(extra)))); table.scale(1, 1.6)
+        else:
+            fpr = numeric(require_column(rows, encoding["fpr_column"]), encoding["fpr_column"]); tpr = numeric(require_column(rows, encoding["tpr_column"]), encoding["tpr_column"])
+            group_values = require_column(rows, encoding["group_column"]); groups = ordered_unique(group_values); cells = []
+            for index, group in enumerate(groups):
+                mask = np.asarray([item == group for item in group_values]); order = np.argsort(fpr[mask]); x, y = fpr[mask][order], tpr[mask][order]
+                plot_ax.plot(x, y, color=palette.hex_colors[index % palette.count], linewidth=1.5, zorder=3, label=group)
+                auc = float(np.trapezoid(y, x)); cells.append([group, f"{auc:.3f}"])
+            plot_ax.axline((0,0), (1,1), color="#858585", linestyle="--", linewidth=0.9, zorder=1)
+            plot_ax.set_xlabel("假阳性率"); plot_ax.set_ylabel("真阳性率"); plot_ax.legend(frameon=False)
+            table_ax.table(cellText=cells, colLabels=["模型", "AUC"], loc="center", cellLoc="center", edges="open", zorder=3)
+        table_ax.axis("off"); plot_ax.set_title(str(encoding.get("title", ""))); _style_all(fig, palette)
+
+    elif TEMPLATE_ID == "shap_beeswarm":
+        features = require_column(rows, encoding["feature_column"]); shap_values = numeric(require_column(rows, encoding["shap_column"]), encoding["shap_column"]); feature_values = numeric(require_column(rows, encoding["feature_value_column"]), encoding["feature_value_column"])
+        feature_labels = ordered_unique(features); cmap = LinearSegmentedColormap.from_list("shap", [palette.hex_colors[0], palette.background, palette.hex_colors[1 % palette.count]])
+        normalized = (feature_values - feature_values.min()) / max(float(np.ptp(feature_values)), 1e-12)
+        for index, feature in enumerate(feature_labels):
+            mask = np.asarray([item == feature for item in features]); count = int(mask.sum())
+            ax.scatter(shap_values[mask], index + _jitter(count, 0.28), c=normalized[mask], cmap=cmap, vmin=0, vmax=1, s=22, alpha=0.78, edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+        ax.axvline(0, color="#858585", linestyle="--", linewidth=0.9, zorder=1); ax.set_yticks(np.arange(len(feature_labels)), feature_labels); ax.invert_yaxis(); ax.set_xlabel("SHAP value")
+        ax.set_title(str(encoding.get("title", ""))); style_axis(ax, palette)
+
+    elif TEMPLATE_ID == "shap_dependence":
+        x = numeric(require_column(rows, encoding["feature_value_column"]), encoding["feature_value_column"]); y = numeric(require_column(rows, encoding["shap_column"]), encoding["shap_column"])
+        interaction_name = str(encoding.get("interaction_column", ""))
+        if interaction_name:
+            interaction = numeric(require_column(rows, interaction_name), interaction_name); cmap = LinearSegmentedColormap.from_list("interaction", [palette.hex_colors[0], palette.background, palette.hex_colors[1 % palette.count]])
+            image = ax.scatter(x, y, c=interaction, cmap=cmap, s=25, alpha=0.76, edgecolors=FILL_EDGE, linewidth=0, zorder=3); add_borderless_colorbar(fig, image, ax=ax, label=interaction_name)
+        else: ax.scatter(x, y, s=25, color=palette.hex_colors[0], alpha=0.76, edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+        ax.axhline(0, color="#858585", linestyle="--", linewidth=0.9, zorder=1); ax.set_xlabel(str(encoding.get("x_label", encoding["feature_value_column"]))); ax.set_ylabel("SHAP value")
+        ax.set_title(str(encoding.get("title", ""))); style_axis(ax, palette)
+
+    elif TEMPLATE_ID == "upset_plot":
+        plt.close(fig)
+        from matplotlib.gridspec import GridSpec
+        items = require_column(rows, encoding["item_column"]); sets = require_column(rows, encoding["set_column"]); set_labels = ordered_unique(sets)
+        membership_name = str(encoding.get("membership_column", "")); membership = require_column(rows, membership_name) if membership_name else ["1"] * len(rows)
+        truthy = {"1","true","yes","是","y"}; by_item = {}
+        for item, set_name, flag in zip(items, sets, membership):
+            if str(flag).strip().lower() in truthy: by_item.setdefault(item, set()).add(set_name)
+        counts = {}
+        for belonged in by_item.values():
+            key = tuple(label in belonged for label in set_labels); counts[key] = counts.get(key, 0) + 1
+        intersections = sorted(counts.items(), key=lambda pair: (-pair[1], pair[0]))[:12]
+        fig = plt.figure(figsize=tuple(CONFIG["figsize"]), facecolor=palette.background); grid = GridSpec(3, 1, figure=fig, hspace=0.05)
+        setattr(fig, "_skip_tight_layout", True); fig.subplots_adjust(left=0.16, right=0.96, bottom=0.16, top=0.90)
+        bar_ax = fig.add_subplot(grid[:2, :]); matrix_ax = fig.add_subplot(grid[2, :], sharex=bar_ax); apply_axis_layer(bar_ax, encoding); apply_axis_layer(matrix_ax, encoding)
+        x = np.arange(len(intersections))
+        bar_ax.bar(x, [count for _, count in intersections], color=bar_face_color(palette, 0), edgecolor=bar_edge_color(palette, 0), linewidth=0.9, zorder=3)
+        for xi, (key, _) in enumerate(intersections):
+            active = [index for index, flag in enumerate(key) if flag]
+            matrix_ax.scatter([xi]*len(set_labels), np.arange(len(set_labels)), s=22, color="#D5D6D8", edgecolors=FILL_EDGE, linewidth=0, zorder=2)
+            if active:
+                matrix_ax.scatter([xi]*len(active), active, s=32, color=palette.hex_colors[1 % palette.count], edgecolors=FILL_EDGE, linewidth=0, zorder=4)
+                if len(active) > 1: matrix_ax.plot([xi,xi], [min(active),max(active)], color=palette.hex_colors[1 % palette.count], linewidth=1.0, zorder=3)
+        matrix_ax.set_yticks(np.arange(len(set_labels)), set_labels); matrix_ax.set_xticks(x, [""]*len(x)); matrix_ax.invert_yaxis(); bar_ax.set_ylabel("交集规模"); bar_ax.set_title(str(encoding.get("title", ""))); _style_all(fig, palette)
+
+    elif TEMPLATE_ID == "spatial_effect_map":
+        longitude = numeric(require_column(rows, encoding["longitude_column"]), encoding["longitude_column"]); latitude = numeric(require_column(rows, encoding["latitude_column"]), encoding["latitude_column"]); values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        cmap = LinearSegmentedColormap.from_list("spatial", [palette.hex_colors[0], palette.background, palette.hex_colors[1 % palette.count]])
+        image = ax.scatter(longitude, latitude, c=values, cmap=cmap, s=34, alpha=0.82, edgecolors=FILL_EDGE, linewidth=0, zorder=3); add_borderless_colorbar(fig, image, ax=ax, label=encoding["value_column"])
+        ax.set_xlabel(str(encoding.get("x_label", "经度"))); ax.set_ylabel(str(encoding.get("y_label", "纬度"))); ax.set_aspect("equal", adjustable="datalim")
+        ax.set_title(str(encoding.get("title", ""))); style_axis(ax, palette)
+
+    elif TEMPLATE_ID == "density_ridges":
+        groups = ordered_unique(require_column(rows, encoding["group_column"])); raw_groups = require_column(rows, encoding["group_column"]); values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        grid = np.linspace(float(values.min()), float(values.max()), 240)
+        for index, group in enumerate(groups):
+            sample = values[np.asarray([item == group for item in raw_groups])]; density = _kde(sample, grid); baseline = float(index)
+            ax.fill_between(grid, baseline, baseline + 0.82*density, color=palette.hex_colors[index % palette.count], alpha=0.62, edgecolor=FILL_EDGE, linewidth=0, zorder=3)
+            ax.plot(grid, baseline + 0.82*density, color=palette.hex_colors[index % palette.count], linewidth=1.0, zorder=4)
+        ax.set_yticks(np.arange(len(groups)), groups); ax.set_xlabel(str(encoding.get("x_label", encoding["value_column"]))); ax.set_ylabel("")
+        ax.set_title(str(encoding.get("title", ""))); style_axis(ax, palette)
+
+    else:
+        raise ValueError(f"Unsupported advanced scientific template: {TEMPLATE_ID}")
+
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

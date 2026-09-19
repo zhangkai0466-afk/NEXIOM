@@ -1,0 +1,18 @@
+{% include "_base_header.py.jinja2" %}
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    cn, v1n, v2n = (encoding[key] for key in ("category_column", "value1_column", "value2_column"))
+    rows = [row for row in rows if all(str(row.get(name, "")).strip() for name in (cn, v1n, v2n))]
+    categories = require_column(rows, cn); v1, v2 = numeric(require_column(rows, v1n), v1n), numeric(require_column(rows, v2n), v2n)
+    palette = setup_style(palette_id); fig, ax = new_axes(palette); apply_axis_layer(ax, encoding)
+    x = np.arange(len(categories)); width = .36
+    ax.bar(x - width / 2, v1, width * 0.84, color=bar_face_color(palette, 0), edgecolor=bar_edge_color(palette, 0), linewidth=0.9, label=str(encoding.get("value1_label", v1n)), zorder=3)
+    ax.bar(x + width / 2, v2, width * 0.84, color=bar_face_color(palette, 1), edgecolor=bar_edge_color(palette, 1), linewidth=0.9, label=str(encoding.get("value2_label", v2n)), zorder=3)
+    ax.set_xticks(x, categories); ax.set_ylabel(str(encoding.get("y_label", "数值"))); ax.set_title(str(encoding.get("title", ""))); ax.legend()
+    if encoding.get("value_labels") is True:
+        for container in ax.containers:
+            ax.bar_label(container, padding=3, fontsize=6)
+    style_axis(ax, palette); return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

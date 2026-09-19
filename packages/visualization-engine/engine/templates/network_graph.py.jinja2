@@ -1,0 +1,34 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    source_name, target_name = encoding["source_column"], encoding["target_column"]
+    sources = require_column(rows, source_name)
+    targets = require_column(rows, target_name)
+    weights = numeric(require_column(rows, str(encoding["weight_column"])), str(encoding["weight_column"])) if encoding.get("weight_column") else np.ones(len(rows))
+    nodes = ordered_unique(sources + targets)
+    theta = np.linspace(0, 2 * np.pi, len(nodes), endpoint=False) + np.pi / 2
+    positions = {node: np.asarray([np.cos(angle), np.sin(angle)]) for node, angle in zip(nodes, theta)}
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    max_weight = float(np.max(weights)) or 1.0
+    for source, target, weight in zip(sources, targets, weights):
+        start, end = positions[source], positions[target]
+        ax.plot([start[0], end[0]], [start[1], end[1]], color="#A6A9AE",
+                linewidth=0.6 + 1.8 * float(weight) / max_weight, alpha=0.58, zorder=2)
+    for index, node in enumerate(nodes):
+        position = positions[node]
+        ax.scatter([position[0]], [position[1]], s=360, color=palette.hex_colors[index % palette.count],
+                   edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+        ax.text(position[0] * 1.18, position[1] * 1.18, node, ha="center", va="center",
+                color=palette.ink, fontsize=8.2, zorder=4)
+    ax.set_title(str(encoding.get("title", "网络关系")))
+    ax.set_aspect("equal")
+    ax.set_axis_off()
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

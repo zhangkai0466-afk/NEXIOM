@@ -1,0 +1,29 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    x_name, value_name, group_name = encoding["x_column"], encoding["value_column"], encoding["group_column"]
+    x_values = numeric(require_column(rows, x_name), x_name)
+    values = numeric(require_column(rows, value_name), value_name)
+    groups = require_column(rows, group_name)
+    x_order = sorted(set(x_values))
+    group_order = ordered_unique(groups)
+    series = []
+    for group in group_order:
+        series.append([float(np.sum(values[(x_values == x_value) & (np.asarray(groups) == group)])) for x_value in x_order])
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    ax.stackplot(x_order, series, colors=[palette.hex_colors[index % palette.count] for index in range(len(series))],
+                 labels=group_order, alpha=0.9, edgecolor=FILL_EDGE, linewidth=0, zorder=3)
+    ax.set_xlabel(str(encoding.get("x_label", x_name)))
+    ax.set_ylabel(str(encoding.get("y_label", value_name)))
+    ax.set_title(str(encoding.get("title", "构成随时间变化")))
+    if len(group_order) > 1:
+        ax.legend()
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

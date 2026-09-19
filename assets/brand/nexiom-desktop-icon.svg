@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 123 123" role="img" aria-labelledby="title desc">
+  <title id="title">NEXIOM desktop application icon</title>
+  <desc id="desc">A folded-ribbon NEXIOM mark centered in white on a square black desktop icon canvas.</desc>
+  <rect width="123" height="123" fill="#000000"/>
+  <g fill="#FFFFFF" transform="translate(61.5 61.5) scale(1.1) translate(-56 -57)">
+    <path d="M31 17V72L46 87V76L39 69V36L66 63V52Z"/>
+    <path d="M66 27V38L73 45V78L46 51V62L81 97V42Z"/>
+  </g>
+</svg>

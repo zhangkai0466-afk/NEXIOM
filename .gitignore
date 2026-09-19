@@ -1,0 +1,22 @@
+node_modules/
+.build/
+dist/
+.local/
+output/
+.playwright-cli/
+*.log
+.env
+.env.*
+!.env.example
+vendor/codex/
+release/
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/

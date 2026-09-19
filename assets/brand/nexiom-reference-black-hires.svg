@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 172 137" role="img" aria-labelledby="title desc">
+  <title id="title">NEXIOM reference mark in black and white</title>
+  <desc id="desc">A faithful vector reconstruction of the supplied five-segment mark, with white geometry on black.</desc>
+  <rect width="172" height="137" fill="#000000"/>
+  <g fill="#FFFFFF">
+    <path d="M33.5 28.5 39.5 22.5 115 98 109 104z"/>
+    <path d="M84.5 28.5 90.5 22.5 114.5 46.5 108.5 52.5z"/>
+    <path d="M33.5 53.5 39.5 47.5 64.5 72.5 58.5 78.5z"/>
+    <path d="M84 54 90.5 47.5 115.5 72.5 109 79z"/>
+    <path d="M33 79 39.5 72.5 64.5 97.5 58 104z"/>
+  </g>
+</svg>

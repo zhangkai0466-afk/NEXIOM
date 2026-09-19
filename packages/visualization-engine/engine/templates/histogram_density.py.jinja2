@@ -1,0 +1,33 @@
+{% include "_base_header.py.jinja2" %}
+import seaborn as sns
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    value_name = encoding["value_column"]
+    values = numeric(require_column(rows, value_name), value_name)
+    group_name = str(encoding.get("group_column", ""))
+    groups = require_column(rows, group_name) if group_name else ["数据"] * len(rows)
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    for index, group in enumerate(ordered_unique(groups)):
+        mask = np.asarray([value == group for value in groups], dtype=bool)
+        sample = values[mask]
+        color = plot_color(palette, index)
+        sns.histplot(x=sample, bins=min(18, max(5, len(sample) // 2)), stat="density", color=color, ax=ax,
+                alpha=0.22, edgecolor=FILL_EDGE, linewidth=0, label=group, zorder=3)
+        # KDE is descriptive only. Constant/singleton groups have no estimable density curve.
+        if len(sample) > 1 and float(np.ptp(sample)) > 0:
+            sns.kdeplot(x=sample, bw_method="scott", bw_adjust=1, cut=0,
+                        gridsize=160, color=color, linewidth=1.55, zorder=3, ax=ax)
+    ax.set_xlabel(str(encoding.get("x_label", value_name)))
+    ax.set_ylabel(str(encoding.get("y_label", "密度")))
+    ax.set_title(str(encoding.get("title", "分布与密度")))
+    if len(ordered_unique(groups)) > 1:
+        ax.legend()
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

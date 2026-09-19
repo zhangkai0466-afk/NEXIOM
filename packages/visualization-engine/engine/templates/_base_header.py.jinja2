@@ -1,0 +1,397 @@
+from __future__ import annotations
+
+import argparse
+import csv
+import json
+from pathlib import Path
+from dataclasses import dataclass
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import numpy as np
+from matplotlib.colors import LinearSegmentedColormap, to_hex, to_rgb
+from matplotlib.patches import Ellipse, Rectangle
+
+try:
+    from scientific_palette_studio.catalog import get_palette
+    from scientific_palette_studio.rendering import FILL_EDGE, configure_matplotlib
+except ImportError:
+    # Generated files must remain reproducible outside the MCP repository.
+    # The bundled fallback intentionally contains only the public attributes
+    # used by the templates; the preferred Studio palette is used when present.
+    FILL_EDGE = "none"
+
+    @dataclass(frozen=True)
+    class _PortablePalette:
+        id: str
+        hex_colors: tuple[str, ...]
+        background: str = "#FFFFFF"
+        ink: str = "#202124"
+
+        @property
+        def count(self) -> int:
+            return len(self.hex_colors)
+
+    _FALLBACK_COLORS = (
+        "#0B7285", "#E8590C", "#4263EB", "#2B8A3E", "#C2255C",
+        "#5F3DC4", "#D9480F", "#087F5B", "#495057",
+    )
+
+    def get_palette(palette_id: str) -> _PortablePalette:
+        return _PortablePalette(palette_id or "portable-teal-ember", _FALLBACK_COLORS)
+
+    def configure_matplotlib() -> None:
+        matplotlib.rcParams.update({"figure.dpi": 120, "savefig.dpi": 300})
+
+
+CONFIG = json.loads({{ config_json_literal }})
+TEMPLATE_ID = CONFIG["template_id"]
+RUNTIME_RULE_CHECKS = []
+
+
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=f"Render {TEMPLATE_ID} with Science Palette Studio colors")
+    parser.add_argument("--data-file", default=CONFIG["data_file"])
+    parser.add_argument("--output-dir", default=str(Path(__file__).resolve().parent / "rendered"))
+    parser.add_argument("--palette-id", default=CONFIG["palette_id"])
+    parser.add_argument("--dpi", type=int, default=CONFIG["dpi"])
+    parser.add_argument("--formats", default=",".join(CONFIG["output_formats"]))
+    return parser.parse_args()
+
+
+def load_rows(path: str | Path) -> list[dict[str, str]]:
+    source = Path(path).expanduser().resolve()
+    if not source.is_file():
+        raise FileNotFoundError(f"Data file not found: {source}")
+    text = source.read_text(encoding="utf-8-sig")
+    delimiter = "\t" if source.suffix.lower() == ".tsv" else ","
+    try:
+        delimiter = csv.Sniffer().sniff(text[:8192], delimiters=",\t;").delimiter
+    except csv.Error:
+        pass
+    reader = csv.DictReader(text.splitlines(), delimiter=delimiter)
+    rows = [{str(key): str(value or "") for key, value in row.items()} for row in reader]
+    filters = CONFIG["encoding"].get("filter", {})
+    if filters:
+        if not isinstance(filters, dict) or any(k not in (reader.fieldnames or []) for k in filters):
+            raise ValueError("筛选条件引用了未知列。")
+        rows = [r for r in rows if all(str(r[k]) in {str(v) for v in (value if isinstance(value, list) else [value])}
+                                       for k, value in filters.items())]
+    if not rows:
+        raise ValueError(f"Data file has no rows: {source}")
+    return rows
+
+
+def require_column(rows: list[dict[str, str]], name: str) -> list[str]:
+    if not name or name not in rows[0]:
+        raise KeyError(f"Required column is missing: {name}")
+    return [row[name] for row in rows]
+
+
+def numeric(values: list[str], name: str) -> np.ndarray:
+    try:
+        result = np.asarray([float(value) for value in values], dtype=float)
+    except ValueError as exc:
+        raise ValueError(f"Column {name} contains a non-numeric value") from exc
+    if not np.all(np.isfinite(result)):
+        raise ValueError(f"Column {name} contains a non-finite value")
+    return result
+
+
+def ordered_unique(values: list[str]) -> list[str]:
+    return list(dict.fromkeys(values))
+
+
+def setup_style(palette_id: str):
+    palette = get_palette(palette_id)
+    configure_matplotlib()
+    matplotlib.rcParams["font.sans-serif"] = [
+        "SimHei", "Microsoft YaHei", "Droid Sans Fallback", "WenQuanYi Micro Hei", "DejaVu Sans"
+    ]
+    matplotlib.rcParams["axes.unicode_minus"] = False
+    matplotlib.rcParams["axes.axisbelow"] = True
+    matplotlib.rcParams["pdf.fonttype"] = 42
+    matplotlib.rcParams["ps.fonttype"] = 42
+    matplotlib.rcParams["svg.fonttype"] = "none"
+    return palette
+
+
+def new_axes(palette, *, polar: bool = False):
+    projection = {"projection": "polar"} if polar else None
+    fig, ax = plt.subplots(figsize=tuple(CONFIG["figsize"]), subplot_kw=projection)
+    fig.patch.set_facecolor(palette.background)
+    ax.set_facecolor(palette.background)
+    ax.set_axisbelow(True)
+    return fig, ax
+
+
+def style_axis(ax, palette) -> None:
+    ax.xaxis.set_zorder(1)
+    ax.yaxis.set_zorder(1)
+    ax.tick_params(color="#92949A", labelcolor=palette.ink, width=0.65, length=3.2)
+    ax.xaxis.label.set_color(palette.ink)
+    ax.yaxis.label.set_color(palette.ink)
+    ax.title.set_color(palette.ink)
+    for spine in ax.spines.values():
+        spine.set_color("#BFC1C5")
+        spine.set_linewidth(0.7)
+        spine.set_zorder(1)
+    enforce_rectangular_axis_frame(ax)
+
+
+def _axis_frame_exemption(ax) -> str:
+    if getattr(ax, "_colorbar", None) is not None or ax.get_label() == "<colorbar>":
+        return "colorbar"
+    if getattr(ax, "name", "") != "rectilinear":
+        return "non_cartesian_projection"
+    if not ax.axison or not ax.get_visible():
+        return "axes_off"
+    if TEMPLATE_ID == "pie":
+        return "pie"
+    return ""
+
+
+def enforce_rectangular_axis_frame(ax) -> bool:
+    """PS-FRAME-001: restore a closed plotting boundary, including zero-spines."""
+    if _axis_frame_exemption(ax):
+        return False
+    ax.set_frame_on(True)
+    ax.set_axisbelow(True)
+    ax.xaxis.set_zorder(1)
+    ax.yaxis.set_zorder(1)
+    for side, position in (("left", 0), ("right", 1), ("bottom", 0), ("top", 1)):
+        spine = ax.spines[side]
+        spine.set_position(("axes", position))
+        spine.set_bounds(*(ax.get_ylim() if side in {"left", "right"} else ax.get_xlim()))
+        spine.set_visible(True)
+        spine.set_color("#BFC1C5")
+        spine.set_linewidth(0.7)
+        spine.set_linestyle("solid")
+        spine.set_zorder(1)
+    # Preserve genuine twinx/twiny scales and intentionally hidden shared labels.
+    if ax.xaxis.get_ticks_position() == "top":
+        ax.tick_params(axis="x", which="both", bottom=False, labelbottom=False)
+    else:
+        ax.tick_params(axis="x", which="both", top=False, labeltop=False)
+    if ax.yaxis.get_ticks_position() == "right":
+        ax.tick_params(axis="y", which="both", left=False, labelleft=False)
+    else:
+        ax.tick_params(axis="y", which="both", right=False, labelright=False)
+    return True
+
+
+def check_rectangular_axis_frames(fig) -> dict:
+    """Inspect rendered Matplotlib artists; source text is not proof of a frame."""
+    axes = []
+    expected = {
+        "left": ((0, 0), (0, 1)), "right": ((1, 0), (1, 1)),
+        "bottom": ((0, 0), (1, 0)), "top": ((0, 1), (1, 1)),
+    }
+    for index, ax in enumerate(fig.axes):
+        exemption = _axis_frame_exemption(ax)
+        if exemption:
+            axes.append({"axis_index": index, "status": "not_applicable", "reason": exemption})
+            continue
+        invalid = []
+        for side, endpoints in expected.items():
+            spine = ax.spines[side]
+            vertices = ax.transAxes.inverted().transform(spine.get_transform().transform(spine.get_path().vertices))
+            if (not ax.get_frame_on() or not spine.get_visible()
+                    or vertices.shape != (2, 2)
+                    or not (np.allclose(vertices, endpoints) or np.allclose(vertices, endpoints[::-1]))
+                    or not np.isclose(spine.get_linewidth(), 0.7)
+                    or to_hex(spine.get_edgecolor()).upper() != "#BFC1C5"
+                    or spine.get_linestyle() not in {"solid", "-"}
+                    or spine.get_zorder() != 1):
+                invalid.append(side)
+        duplicate_ticks = []
+        for axis, side in ((ax.xaxis, "top"), (ax.yaxis, "right")):
+            if axis.get_visible() and axis.get_ticks_position() != side:
+                ticks = [*axis.get_major_ticks(), *axis.get_minor_ticks()]
+                if any(tick.tick2line.get_visible() or tick.label2.get_visible() for tick in ticks):
+                    duplicate_ticks.append(side)
+        axes.append({
+            "axis_index": index, "status": "failed" if invalid or duplicate_ticks else "passed",
+            "invalid_sides": invalid, "duplicate_tick_sides": duplicate_ticks,
+        })
+    return {
+        "rule_id": "PS-FRAME-001", "verification": "matplotlib_artists_after_draw",
+        "passed": all(item["status"] != "failed" for item in axes), "axes": axes,
+    }
+
+
+def apply_axis_layer(ax, encoding: dict) -> None:
+    """Draw every grid/reference axis line before foreground data artists."""
+    ax.set_axisbelow(True)
+    if "x_domain" in encoding:
+        ax.set_xlim(*encoding["x_domain"])
+    if "y_domain" in encoding:
+        ax.set_ylim(*encoding["y_domain"])
+    if encoding.get("equal_aspect") is True:
+        ax.set_aspect("equal", adjustable="box")
+    x_scale = str(encoding.get("x_scale", "linear"))
+    y_scale = str(encoding.get("y_scale", "linear"))
+    if x_scale != ax.get_xscale():
+        ax.set_xscale(x_scale)
+    if y_scale != ax.get_yscale():
+        ax.set_yscale(y_scale)
+    grid_axis = str(encoding.get("grid_axis", "none")).lower()
+    if grid_axis in {"x", "y", "both"}:
+        ax.grid(
+            True,
+            axis=grid_axis,
+            color=str(encoding.get("grid_color", "#D8D9DC")),
+            linewidth=float(encoding.get("grid_linewidth", 0.65)),
+            alpha=float(encoding.get("grid_alpha", 0.72)),
+            zorder=0,
+        )
+    for line in encoding.get("reference_lines", []):
+        artist = None
+        if "x" in line:
+            artist = ax.axvline(float(line["x"]), color="#777777", linewidth=0.9,
+                                linestyle=str(line.get("linestyle", "--")), zorder=1)
+        if "y" in line:
+            artist = ax.axhline(float(line["y"]), color="#777777", linewidth=0.9,
+                                linestyle=str(line.get("linestyle", "--")), zorder=1)
+        if "through" in line and "towards" in line:
+            through = tuple(float(value) for value in line["through"])
+            towards = tuple(float(value) for value in line["towards"])
+            artist = ax.axline(through, towards, color="#777777", linewidth=0.9,
+                               linestyle=str(line.get("linestyle", "--")), zorder=1)
+        label = str(line.get("label", "")).strip()
+        if artist is not None and label:
+            artist.set_label(label)
+
+
+def apply_annotations(ax, encoding: dict) -> None:
+    for note in encoding.get("annotations", []):
+        if {"x", "y", "text"} <= set(note):
+            ax.annotate(str(note["text"]), (float(note["x"]), float(note["y"])),
+                        color="#555555", fontsize=8.2, zorder=5)
+
+
+def add_borderless_colorbar(fig, image, **kwargs):
+    """Hard visual rule: continuous color bars never carry a black frame."""
+    colorbar = fig.colorbar(image, **kwargs)
+    colorbar.outline.set_visible(False)
+    for spine in colorbar.ax.spines.values():
+        spine.set_visible(False)
+    return colorbar
+
+
+def mix_color(color: str, background: str, amount: float = 0.74) -> str:
+    """Return a quiet tint while keeping the source hue recognizable."""
+    foreground_rgb = np.asarray(to_rgb(color), dtype=float)
+    background_rgb = np.asarray(to_rgb(background), dtype=float)
+    ratio = float(np.clip(amount, 0.0, 1.0))
+    return to_hex(foreground_rgb * (1.0 - ratio) + background_rgb * ratio)
+
+
+def premium_bar_style(color: str, palette, *, alpha: float = 0.96) -> dict:
+    """Journal-style bar: pale same-hue fill plus a clear, non-black outline."""
+    return {
+        "color": mix_color(color, palette.background, 0.54),
+        "edgecolor": color,
+        "linewidth": 0.9,
+        "alpha": alpha,
+    }
+
+
+def _matched_bar_outlines(palette) -> list[str]:
+    for group in getattr(palette, "extension_groups", ()):
+        if getattr(group, "id", "") == "matched-outlines":
+            colors = [item.hex for item in group.colors]
+            if len(colors) == palette.count:
+                return colors
+    return []
+
+
+def plot_colors(palette) -> list[str]:
+    """Put primary/highlight colors before pale support swatches for data marks."""
+    items = list(getattr(palette, "colors", ()))
+    if not items:
+        return list(palette.hex_colors)
+    priority = {
+        "primary": 0, "highlight": 1, "start": 2, "end": 2,
+        "high": 3, "low": 3, "secondary": 4, "annotation": 5,
+        "support": 8, "center": 9,
+    }
+    ranked = sorted(enumerate(items), key=lambda pair: (priority.get(getattr(pair[1], "role", ""), 6), pair[0]))
+    return [item.hex for _, item in ranked]
+
+
+def plot_color(palette, index: int) -> str:
+    colors = plot_colors(palette)
+    return colors[index % len(colors)]
+
+
+def bar_face_color(palette, index: int) -> str:
+    color = plot_color(palette, index)
+    return color if _matched_bar_outlines(palette) else mix_color(color, palette.background, 0.54)
+
+
+def bar_edge_color(palette, index: int) -> str:
+    outlines = _matched_bar_outlines(palette)
+    return outlines[index % len(outlines)] if outlines else plot_color(palette, index)
+
+
+def apply_deterministic_layout(fig) -> dict:
+    """Fix routine layout defects locally; never requires another AI call."""
+    actions = []
+    for index, ax in enumerate(fig.axes):
+        if enforce_rectangular_axis_frame(ax):
+            actions.append({"type": "enforce_rectangular_axis_frame", "rule_id": "PS-FRAME-001", "axis_index": index})
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    for ax in fig.axes:
+        labels = [item.get_text() for item in ax.get_xticklabels() if item.get_text()]
+        max_chars = max((len(item) for item in labels), default=0)
+        if getattr(ax, "name", "") not in {"3d", "polar"} and (len(labels) >= 7 or max_chars >= 10):
+            rotation = 45 if max_chars < 18 else 60
+            for label in ax.get_xticklabels():
+                label.set_rotation(rotation)
+                label.set_horizontalalignment("right")
+            actions.append({"type": "rotate_x_tick_labels", "degrees": rotation})
+        legend = ax.get_legend()
+        if legend is not None:
+            legend.get_frame().set_linewidth(0)
+            legend.set_zorder(10)
+            fig.canvas.draw()
+            legend_box = legend.get_window_extent(renderer)
+            axis_box = ax.get_window_extent(renderer)
+            if legend_box.overlaps(axis_box) and len(legend.get_texts()) >= 3:
+                legend.remove()
+                ax.legend(loc="upper center", bbox_to_anchor=(0.5, -0.18),
+                          ncol=min(4, len(legend.get_texts())), frameon=False)
+                actions.append({"type": "move_legend_outside", "location": "bottom"})
+    if not getattr(fig, "_skip_tight_layout", False):
+        fig.tight_layout(pad=1.15)
+    for ax in fig.axes:
+        enforce_rectangular_axis_frame(ax)
+    fig.canvas.draw()
+    frame_check = check_rectangular_axis_frames(fig)
+    if not frame_check["passed"]:
+        raise ValueError(f"PS-FRAME-001: incomplete rectangular plotting frame: {frame_check['axes']}")
+    return {"actions": actions, "rule_checks": [frame_check]}
+
+
+def save_figure(fig, output_dir: str | Path, stem: str, formats: list[str], dpi: int, palette) -> list[Path]:
+    target = Path(output_dir).expanduser().resolve()
+    target.mkdir(parents=True, exist_ok=True)
+    layout_report = apply_deterministic_layout(fig)
+    setattr(fig, "_visual_design_layout_report", layout_report)
+    (target / f"{stem}.quality.json").write_text(json.dumps(layout_report, ensure_ascii=False), encoding="utf-8")
+    RUNTIME_RULE_CHECKS.extend(layout_report["rule_checks"])
+    paths = []
+    for output_format in formats:
+        output_format = output_format.strip().lower()
+        if output_format not in {"pdf", "png", "svg"}:
+            raise ValueError(f"Unsupported output format: {output_format}")
+        path = target / f"{stem}.{output_format}"
+        options = {"dpi": dpi} if output_format == "png" else {}
+        fig.savefig(path, facecolor=palette.background, bbox_inches="tight", **options)
+        paths.append(path)
+    plt.close(fig)
+    return paths

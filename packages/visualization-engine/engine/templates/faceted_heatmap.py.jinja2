@@ -1,0 +1,39 @@
+{% include "_base_header.py.jinja2" %}
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    rn, cn, vn, gn = (encoding[key] for key in ("row_column", "column_column", "value_column", "group_column"))
+    filter_name = str(encoding.get("filter_column", ""))
+    filter_values = {str(value) for value in encoding.get("filter_values", [])}
+    if filter_name and filter_values:
+        rows = [row for row in rows if str(row.get(filter_name, "")) in filter_values]
+    row_values, col_values, group_values = require_column(rows, rn), require_column(rows, cn), require_column(rows, gn)
+    values = numeric(require_column(rows, vn), vn)
+    row_labels, col_labels, groups = ordered_unique(row_values), ordered_unique(col_values), ordered_unique(group_values)
+    if len(groups) < 2:
+        raise ValueError("faceted_heatmap 至少需要两个同构分面；单组数据应使用普通 heatmap。")
+    palette = setup_style(palette_id)
+    panel_columns = max(1, int(np.ceil(np.sqrt(len(groups) * 1.35)))); panel_rows = int(np.ceil(len(groups) / panel_columns))
+    fig, axes = plt.subplots(panel_rows, panel_columns, figsize=(4.1 * panel_columns, max(3.7 * panel_rows, .34 * len(row_labels) * panel_rows)), squeeze=False)
+    axes = np.asarray(axes).reshape(-1)
+    cmap = LinearSegmentedColormap.from_list(f"{palette.id}-continuous", palette.hex_colors)
+    image = None
+    for ax, group in zip(axes, groups):
+        ax.set_facecolor(palette.background); apply_axis_layer(ax, encoding)
+        matrix = np.full((len(row_labels), len(col_labels)), np.nan)
+        for index, value in enumerate(values):
+            if group_values[index] == group:
+                matrix[row_labels.index(row_values[index]), col_labels.index(col_values[index])] = value
+        image = ax.imshow(matrix, cmap=cmap, aspect="auto", vmin=float(encoding.get("vmin", -1)), vmax=float(encoding.get("vmax", 1)), zorder=3)
+        ax.set_xticks(np.arange(len(col_labels)), col_labels); ax.set_yticks(np.arange(len(row_labels)), row_labels)
+        ax.set_title(str(group)); style_axis(ax, palette)
+    for ax in axes[len(groups):]:
+        ax.axis("off")
+    if image is not None:
+        fig.subplots_adjust(left=.08, right=.88, bottom=.18, top=.90, wspace=.22)
+        colorbar_ax = fig.add_axes([.91, .22, .018, .58])
+        add_borderless_colorbar(fig, image, cax=colorbar_ax, label=str(encoding.get("colorbar_label", vn)))
+        setattr(fig, "_skip_tight_layout", True)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

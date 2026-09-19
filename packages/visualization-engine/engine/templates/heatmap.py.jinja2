@@ -1,0 +1,32 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    row_name, column_name, value_name = encoding["row_column"], encoding["column_column"], encoding["value_column"]
+    rows = [row for row in rows if all(str(row.get(name, "")).strip() for name in (row_name, column_name, value_name))]
+    row_labels = ordered_unique(require_column(rows, row_name))
+    column_labels = ordered_unique(require_column(rows, column_name))
+    values = numeric(require_column(rows, value_name), value_name)
+    matrix = np.full((len(row_labels), len(column_labels)), np.nan)
+    raw_rows, raw_columns = require_column(rows, row_name), require_column(rows, column_name)
+    for index, value in enumerate(values):
+        matrix[row_labels.index(raw_rows[index]), column_labels.index(raw_columns[index])] = value
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+    cmap = LinearSegmentedColormap.from_list(f"{palette.id}-continuous", palette.hex_colors)
+    color_scale = encoding.get("color_scale", {})
+    domain = color_scale.get("domain", [None, None])
+    image = ax.imshow(matrix, cmap=cmap, aspect="auto", vmin=domain[0], vmax=domain[1], zorder=3)
+    ax.set_xticks(np.arange(len(column_labels)), column_labels)
+    ax.set_yticks(np.arange(len(row_labels)), row_labels)
+    ax.set_xlabel(str(encoding.get("x_label", column_name)))
+    ax.set_ylabel(str(encoding.get("y_label", row_name)))
+    ax.set_title(str(encoding.get("title", "")))
+    add_borderless_colorbar(fig, image, ax=ax, fraction=0.046, pad=0.04, label=value_name)
+    apply_annotations(ax, encoding)
+    style_axis(ax, palette)
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

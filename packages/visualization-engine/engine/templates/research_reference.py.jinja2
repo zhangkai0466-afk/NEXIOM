@@ -1,0 +1,171 @@
+{% include "_base_header.py.jinja2" %}
+
+
+def _jitter(count: int, width: float = 0.12) -> np.ndarray:
+    return np.zeros(count) if count <= 1 else np.linspace(-width, width, count)
+
+
+def _kde(values: np.ndarray, grid: np.ndarray) -> np.ndarray:
+    values = np.asarray(values, dtype=float)
+    spread = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
+    bandwidth = max(spread * max(len(values), 2) ** (-0.2), max(float(np.ptp(values)), 1.0) * 0.035, 1e-9)
+    density = np.exp(-0.5 * ((grid[:, None] - values[None, :]) / bandwidth) ** 2).mean(axis=1)
+    return density / max(float(density.max()), 1e-12)
+
+
+def _panel_grid(count: int) -> tuple[int, int]:
+    if count <= 3:
+        return 1, max(1, count)
+    columns = max(2, int(np.ceil(np.sqrt(count))))
+    return int(np.ceil(count / columns)), columns
+
+
+def _style_axes(fig, palette) -> None:
+    for axis in fig.axes:
+        if axis.get_label() != "<colorbar>":
+            style_axis(axis, palette)
+
+
+def render(data_file: str, output_dir: str, palette_id: str, formats: list[str], dpi: int) -> list[Path]:
+    rows, encoding = load_rows(data_file), CONFIG["encoding"]
+    palette = setup_style(palette_id)
+    fig, ax = new_axes(palette)
+    apply_axis_layer(ax, encoding)
+
+    if TEMPLATE_ID == "faceted_density_rug":
+        plt.close(fig)
+        features = require_column(rows, encoding["feature_column"])
+        groups = require_column(rows, encoding["group_column"])
+        values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        feature_labels, group_labels = ordered_unique(features), ordered_unique(groups)
+        panel_rows, panel_columns = _panel_grid(len(feature_labels))
+        fig, axes = plt.subplots(panel_rows, panel_columns, figsize=(4.2 * panel_columns, 3.1 * panel_rows), squeeze=False)
+        fig.patch.set_facecolor(palette.background)
+        for axis, feature in zip(axes.flat, feature_labels):
+            axis.set_facecolor(palette.background); apply_axis_layer(axis, encoding)
+            feature_mask = np.asarray([item == feature for item in features])
+            local = values[feature_mask]
+            grid = np.linspace(float(local.min()), float(local.max()), 240)
+            for group_index, group in enumerate(group_labels):
+                mask = feature_mask & np.asarray([item == group for item in groups])
+                sample = values[mask]
+                if len(sample) < 3:
+                    continue
+                density = _kde(sample, grid); color = palette.hex_colors[group_index % palette.count]
+                axis.fill_between(grid, 0, density, color=color, alpha=0.18, edgecolor=FILL_EDGE, linewidth=0, zorder=2)
+                axis.plot(grid, density, color=color, linewidth=1.35, zorder=4, label=group)
+                axis.vlines(sample, -0.08 - group_index * 0.055, -0.035 - group_index * 0.055, color=color, alpha=0.48, linewidth=0.55, zorder=1)
+            axis.set_title(str(feature)); axis.set_yticks([]); axis.legend(frameon=False, fontsize=8)
+        for axis in list(axes.flat)[len(feature_labels):]: axis.axis("off")
+        fig.suptitle(str(encoding.get("title", ""))); _style_axes(fig, palette)
+
+    elif TEMPLATE_ID == "split_bean_plot":
+        categories = require_column(rows, encoding["category_column"])
+        groups = require_column(rows, encoding["group_column"])
+        values = numeric(require_column(rows, encoding["value_column"]), encoding["value_column"])
+        category_labels, group_labels = ordered_unique(categories), ordered_unique(groups)
+        if len(group_labels) != 2:
+            raise ValueError("split_bean_plot requires exactly two groups")
+        for category_index, category in enumerate(category_labels):
+            for group_index, group in enumerate(group_labels):
+                mask = np.asarray([c == category and g == group for c, g in zip(categories, groups)])
+                sample = values[mask]; color = palette.hex_colors[group_index % palette.count]
+                violin = ax.violinplot(sample, positions=[category_index], widths=0.72, showextrema=False)
+                for body in violin["bodies"]:
+                    vertices = body.get_paths()[0].vertices
+                    if group_index == 0: vertices[:, 0] = np.minimum(vertices[:, 0], category_index)
+                    else: vertices[:, 0] = np.maximum(vertices[:, 0], category_index)
+                    body.set_facecolor(color); body.set_edgecolor("none"); body.set_alpha(0.28); body.set_zorder(2)
+                side = -1 if group_index == 0 else 1
+                ax.scatter(category_index + side * (0.12 + np.abs(_jitter(len(sample), 0.13))), sample, s=18, color=color, alpha=0.68, edgecolors=FILL_EDGE, linewidth=0, zorder=4, label=group if category_index == 0 else None)
+                ax.plot(category_index + side * 0.035, float(np.median(sample)), marker="s", markersize=4.5, color=color, zorder=5)
+        ax.set_xticks(np.arange(len(category_labels)), category_labels); ax.set_ylabel(str(encoding.get("y_label", encoding["value_column"])))
+        ax.set_title(str(encoding.get("title", ""))); ax.legend(frameon=False); style_axis(ax, palette)
+
+    elif TEMPLATE_ID == "faceted_prediction_diagnostics":
+        plt.close(fig)
+        observed = numeric(require_column(rows, encoding["observed_column"]), encoding["observed_column"])
+        predicted = numeric(require_column(rows, encoding["predicted_column"]), encoding["predicted_column"])
+        models = require_column(rows, encoding["model_column"]); model_labels = ordered_unique(models)
+        split_name = str(encoding.get("split_column", "")); splits = require_column(rows, split_name) if split_name else ["样本"] * len(rows)
+        split_labels = ordered_unique(splits); panel_rows, panel_columns = _panel_grid(len(model_labels))
+        fig, axes = plt.subplots(panel_rows, panel_columns, figsize=(4.0 * panel_columns, 3.6 * panel_rows), squeeze=False)
+        fig.patch.set_facecolor(palette.background)
+        for axis, model in zip(axes.flat, model_labels):
+            axis.set_facecolor(palette.background); apply_axis_layer(axis, encoding)
+            model_mask = np.asarray([item == model for item in models]); x, y = observed[model_mask], predicted[model_mask]
+            lo, hi = float(min(x.min(), y.min())), float(max(x.max(), y.max()))
+            axis.axline((lo, lo), (hi, hi), color="#858585", linestyle="--", linewidth=0.9, zorder=1, label="1:1")
+            split_markers = ("o", "^", "s", "D")
+            for split_index, split in enumerate(split_labels):
+                mask = model_mask & np.asarray([item == split for item in splits]); color = palette.hex_colors[split_index % palette.count]
+                axis.scatter(observed[mask], predicted[mask], s=25, marker=split_markers[split_index % len(split_markers)], color=color, alpha=0.76, edgecolors=FILL_EDGE, linewidth=0, zorder=3, label=split)
+            slope, intercept = np.polyfit(x, y, 1); fit_x = np.asarray([lo, hi])
+            axis.plot(fit_x, slope * fit_x + intercept, color=palette.hex_colors[0], linewidth=1.35, zorder=4)
+            residual = y - x
+            r2 = float(np.corrcoef(x, y)[0, 1] ** 2) if len(x) > 1 and np.std(x) > 0 and np.std(y) > 0 else float("nan")
+            axis.text(0.04, 0.95, f"n={len(x)}\n$R^2$={r2:.2f}\nRMSE={np.sqrt(np.mean(residual**2)):.2f}\nMAE={np.mean(np.abs(residual)):.2f}", transform=axis.transAxes, va="top", fontsize=8.2, color=palette.ink, zorder=5)
+            axis.set_title(str(model)); axis.set_xlabel(str(encoding.get("x_label", encoding["observed_column"]))); axis.set_ylabel(str(encoding.get("y_label", encoding["predicted_column"]))); axis.legend(frameon=False, fontsize=7.5)
+        for axis in list(axes.flat)[len(model_labels):]: axis.axis("off")
+        fig.suptitle(str(encoding.get("title", ""))); _style_axes(fig, palette)
+
+    elif TEMPLATE_ID == "gradient_stacked_histogram_fit":
+        residuals = numeric(require_column(rows, encoding["residual_column"]), encoding["residual_column"])
+        group_name = str(encoding.get("group_column", "")); groups = require_column(rows, group_name) if group_name else ["残差"] * len(rows)
+        group_labels = ordered_unique(groups); bin_count = int(encoding.get("bin_count", min(20, max(7, int(np.sqrt(len(residuals)))))))
+        edges = np.linspace(float(residuals.min()), float(residuals.max()), bin_count + 1); bottoms = np.zeros(bin_count)
+        for group_index, group in enumerate(group_labels):
+            sample = residuals[np.asarray([item == group for item in groups])]; counts, _ = np.histogram(sample, bins=edges)
+            color = palette.hex_colors[group_index % palette.count]; cmap = LinearSegmentedColormap.from_list(f"bar_{group_index}", [mix_color(color, palette.background, 0.92), color])
+            for bin_index, count in enumerate(counts):
+                if count <= 0: continue
+                left, right = edges[bin_index], edges[bin_index + 1]; bottom, top = bottoms[bin_index], bottoms[bin_index] + count
+                ax.imshow(np.linspace(0, 1, 96).reshape(96, 1), extent=[left, right, bottom, top], origin="lower", aspect="auto", cmap=cmap, interpolation="bicubic", zorder=3)
+                ax.add_patch(Rectangle((left, bottom), right-left, count, fill=False, edgecolor=color, linewidth=0.55, alpha=0.75, zorder=4))
+            bottoms += counts
+            ax.plot([], [], color=color, linewidth=6, alpha=0.72, label=group, zorder=4)
+        spread = float(np.std(residuals, ddof=1)); center = float(np.mean(residuals))
+        if spread > 0:
+            grid = np.linspace(float(edges[0]), float(edges[-1]), 320)
+            density = np.exp(-0.5*((grid-center)/spread)**2) / (spread*np.sqrt(2*np.pi))
+            ax.plot(grid, density * len(residuals) * (edges[1]-edges[0]), color=palette.ink, linewidth=1.55, zorder=5, label="正态拟合")
+        ax.set_xlim(float(edges[0]), float(edges[-1])); ax.set_xlabel(str(encoding.get("x_label", encoding["residual_column"]))); ax.set_ylabel("频数")
+        ax.set_title(str(encoding.get("title", ""))); ax.legend(frameon=False); style_axis(ax, palette)
+
+    elif TEMPLATE_ID == "faceted_shap_dependence_distribution":
+        plt.close(fig)
+        features = require_column(rows, encoding["feature_column"]); feature_labels = ordered_unique(features)
+        x = numeric(require_column(rows, encoding["feature_value_column"]), encoding["feature_value_column"]); y = numeric(require_column(rows, encoding["shap_column"]), encoding["shap_column"])
+        panel_rows, panel_columns = _panel_grid(len(feature_labels)); fig, axes = plt.subplots(panel_rows, panel_columns, figsize=(4.0*panel_columns, 3.4*panel_rows), squeeze=False)
+        fig.patch.set_facecolor(palette.background)
+        for axis, feature in zip(axes.flat, feature_labels):
+            axis.set_facecolor(palette.background); apply_axis_layer(axis, encoding); mask = np.asarray([item == feature for item in features]); fx, fy = x[mask], y[mask]
+            axis.scatter(fx, fy, s=20, color=palette.hex_colors[0], alpha=0.68, edgecolors=FILL_EDGE, linewidth=0, zorder=3)
+            order = np.argsort(fx); chunks = [chunk for chunk in np.array_split(order, min(9, max(3, len(order)//4))) if len(chunk)]
+            centers = np.asarray([np.median(fx[chunk]) for chunk in chunks]); medians = np.asarray([np.median(fy[chunk]) for chunk in chunks])
+            axis.plot(centers, medians, color=palette.hex_colors[1 % palette.count], linewidth=1.45, zorder=4)
+            twin = axis.twinx(); twin.hist(fx, bins=min(14, max(5, int(np.sqrt(len(fx))))), color=mix_color(palette.hex_colors[0], palette.background, 0.72), edgecolor=FILL_EDGE, linewidth=0, alpha=0.28, zorder=2); twin.set_yticks([]); twin.set_ylim(0, max(twin.get_ylim()[1]*3.2, 1))
+            axis.axhline(0, color="#858585", linestyle="--", linewidth=0.8, zorder=1); axis.set_title(str(feature)); axis.set_xlabel("特征值"); axis.set_ylabel("SHAP value")
+        for axis in list(axes.flat)[len(feature_labels):]: axis.axis("off")
+        fig.suptitle(str(encoding.get("title", ""))); _style_axes(fig, palette)
+
+    elif TEMPLATE_ID == "ordination_ellipse":
+        x = numeric(require_column(rows, encoding["x_column"]), encoding["x_column"]); y = numeric(require_column(rows, encoding["y_column"]), encoding["y_column"])
+        groups = require_column(rows, encoding["group_column"]); group_labels = ordered_unique(groups)
+        for group_index, group in enumerate(group_labels):
+            mask = np.asarray([item == group for item in groups]); gx, gy = x[mask], y[mask]; color = palette.hex_colors[group_index % palette.count]
+            ax.scatter(gx, gy, s=25, color=color, alpha=0.74, edgecolors=FILL_EDGE, linewidth=0, zorder=3, label=group)
+            if len(gx) >= 3:
+                covariance = np.cov(np.vstack([gx, gy])); eigenvalues, eigenvectors = np.linalg.eigh(covariance); order = eigenvalues.argsort()[::-1]
+                eigenvalues, eigenvectors = eigenvalues[order], eigenvectors[:, order]; angle = float(np.degrees(np.arctan2(eigenvectors[1,0], eigenvectors[0,0])))
+                ellipse = Ellipse((float(gx.mean()), float(gy.mean())), 2*1.96*np.sqrt(max(eigenvalues[0],0)), 2*1.96*np.sqrt(max(eigenvalues[1],0)), angle=angle, facecolor=mix_color(color, palette.background, 0.80), edgecolor=color, linewidth=1.0, alpha=0.40, zorder=2)
+                ax.add_patch(ellipse)
+        ax.set_xlabel(str(encoding.get("x_label", encoding["x_column"]))); ax.set_ylabel(str(encoding.get("y_label", encoding["y_column"])))
+        ax.set_title(str(encoding.get("title", ""))); ax.legend(frameon=False); style_axis(ax, palette)
+
+    else:
+        raise ValueError(f"Unsupported research reference template: {TEMPLATE_ID}")
+
+    return save_figure(fig, output_dir, TEMPLATE_ID, formats, dpi, palette)
+
+{% include "_base_footer.py.jinja2" %}

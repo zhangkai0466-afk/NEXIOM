@@ -1,0 +1,465 @@
+{
+  "schema_version": "1.2.0",
+  "palettes": [
+    {
+      "id": "pelagic-bloom-7",
+      "name": "浮海花簇",
+      "name_en": "Pelagic Bloom",
+      "kind": "categorical",
+      "count": 7,
+      "description": "一组低饱和的紫、珊瑚与海水色系，适合多类别比较和生物信息图。",
+      "source_note": "根据参考图中的七色色卡手工重建",
+      "background": "#F6FAFB",
+      "ink": "#2E3142",
+      "accent_index": 2,
+      "tags": ["低饱和", "生物", "多类别", "冷暖平衡"],
+      "colors": [
+        {"name": "薄暮薰衣草", "name_en": "Lavender Dusk", "hex": "#6A5C95", "role": "primary"},
+        {"name": "珊瑚花", "name_en": "Coral Bloom", "hex": "#D99AAE", "role": "primary"},
+        {"name": "珊瑚桃", "name_en": "Coral Peach", "hex": "#E7A889", "role": "highlight"},
+        {"name": "海沫绿", "name_en": "Seafoam Mist", "hex": "#A9C8B8", "role": "primary"},
+        {"name": "淡水青", "name_en": "Pale Aqua", "hex": "#CFE3E6", "role": "support"},
+        {"name": "长春花蓝", "name_en": "Periwinkle Blue", "hex": "#8FA2D6", "role": "primary"},
+        {"name": "板岩紫", "name_en": "Slate Violet", "hex": "#5B608C", "role": "annotation"}
+      ]
+    },
+    {
+      "id": "cryo-terracotta-8",
+      "name": "冰晶陶土",
+      "name_en": "Cryo Terracotta",
+      "kind": "categorical",
+      "count": 8,
+      "description": "冰青与泥土暖色相接，强调色清晰，适合机制、光谱和时间序列图。",
+      "source_note": "根据参考图中的八色色卡手工重建",
+      "background": "#F5F4F1",
+      "ink": "#34333B",
+      "accent_index": 5,
+      "tags": ["冷暖对照", "机制", "光谱", "多类别"],
+      "colors": [
+        {"name": "冰青", "name_en": "Icy Cyan", "hex": "#A9CCD9", "role": "primary"},
+        {"name": "淡蓝", "name_en": "Pale Blue", "hex": "#C7DBE6", "role": "support"},
+        {"name": "薰衣草紫", "name_en": "Lavender Violet", "hex": "#8E80AC", "role": "primary"},
+        {"name": "长春花蓝", "name_en": "Periwinkle", "hex": "#6E7FAF", "role": "primary"},
+        {"name": "灰粉葵", "name_en": "Dusty Mauve", "hex": "#B695A7", "role": "secondary"},
+        {"name": "陶土橙", "name_en": "Terracotta", "hex": "#CB6F4A", "role": "highlight"},
+        {"name": "陶泥棕", "name_en": "Clay Brown", "hex": "#8D6A5C", "role": "annotation"},
+        {"name": "暖纸白", "name_en": "Warm Neutral", "hex": "#F2EFEA", "role": "support"}
+      ]
+    },
+    {
+      "id": "blossom-sage-8",
+      "name": "樱草清新",
+      "name_en": "Blossom Sage",
+      "kind": "continuous",
+      "count": 8,
+      "description": "从森林绿经薄荷、鼠尾草与奶油色过渡到柔粉色的连续渐变，适合有序数值、密度场与连续趋势。",
+      "source_note": "按用户提供参考图中的 HEX 与 RGB 录入，并依据感知色彩路径重新排序",
+      "background": "#FFFBFC",
+      "ink": "#304239",
+      "accent_index": 7,
+      "tags": ["粉绿", "柔和", "渐变", "连续"],
+      "colors": [
+        {"name": "森林绿", "name_en": "Forest Leaf", "hex": "#6BAA7A", "role": "start"},
+        {"name": "嫩叶绿", "name_en": "Tender Leaf", "hex": "#B7E1C1", "role": "low"},
+        {"name": "清新绿", "name_en": "Fresh Mint", "hex": "#C8EAD5", "role": "low"},
+        {"name": "薄荷绿", "name_en": "Mint Milk", "hex": "#DFF2E3", "role": "low"},
+        {"name": "浅鼠尾草", "name_en": "Pale Sage", "hex": "#D9E6D2", "role": "center"},
+        {"name": "奶油米", "name_en": "Cream Rice", "hex": "#FFF6E3", "role": "center"},
+        {"name": "樱花粉", "name_en": "Cherry Milk", "hex": "#FAD6DE", "role": "high"},
+        {"name": "雾莓粉", "name_en": "Berry Blush", "hex": "#F7BFCB", "role": "end"}
+      ]
+    },
+    {
+      "id": "pastel-maiden-8",
+      "name": "粉彩少女",
+      "name_en": "Pastel Maiden",
+      "kind": "continuous",
+      "count": 8,
+      "description": "从薰衣草紫经中性灰过渡到珊瑚粉的双端渐变，适合偏差、效应方向和连续数值。",
+      "source_note": "按用户提供参考图中标注的 HEX 与 RGB 顺序录入",
+      "background": "#FBFAFC",
+      "ink": "#3E3A49",
+      "accent_index": 7,
+      "tags": ["紫粉", "双端", "渐变", "连续"],
+      "colors": [
+        {"name": "薰衣草紫", "name_en": "Lavender", "hex": "#B6B3D6", "role": "start"},
+        {"name": "浅薰衣草", "name_en": "Pale Lavender", "hex": "#CFCCE3", "role": "low"},
+        {"name": "紫灰雾", "name_en": "Violet Mist", "hex": "#D5D3DE", "role": "low"},
+        {"name": "中性灰", "name_en": "Neutral Grey", "hex": "#D5D1D1", "role": "center"},
+        {"name": "桃粉雾", "name_en": "Peach Mist", "hex": "#F6DFD6", "role": "center"},
+        {"name": "柔桃粉", "name_en": "Soft Peach", "hex": "#F8B2A2", "role": "high"},
+        {"name": "珊瑚粉", "name_en": "Coral Pink", "hex": "#F1837A", "role": "high"},
+        {"name": "玫瑰红", "name_en": "Rose Red", "hex": "#E9687A", "role": "end"}
+      ]
+    },
+    {
+      "id": "summer-coast-8",
+      "name": "夏日海滩",
+      "name_en": "Summer Coast",
+      "kind": "continuous",
+      "count": 8,
+      "description": "由珊瑚红、橙黄、草绿延伸到海蓝的多段连续渐变，适合有序等级和连续场。",
+      "source_note": "按用户提供参考图中标注的 HEX 与 RGB 顺序录入",
+      "background": "#FFFBFA",
+      "ink": "#32414A",
+      "accent_index": 0,
+      "tags": ["暖冷过渡", "多段", "渐变", "连续"],
+      "colors": [
+        {"name": "珊瑚红", "name_en": "Coral Red", "hex": "#FC757B", "role": "start"},
+        {"name": "朱砂橙", "name_en": "Vermilion Orange", "hex": "#F97F5F", "role": "low"},
+        {"name": "蜜瓜橙", "name_en": "Melon Orange", "hex": "#FAA26F", "role": "low"},
+        {"name": "杏子黄", "name_en": "Apricot", "hex": "#FDCD94", "role": "center"},
+        {"name": "日光黄", "name_en": "Sunlight", "hex": "#FEE199", "role": "center"},
+        {"name": "鼠尾草绿", "name_en": "Sage Green", "hex": "#B0D6A9", "role": "high"},
+        {"name": "浅海青", "name_en": "Shallow Teal", "hex": "#65BDBA", "role": "high"},
+        {"name": "海湾蓝", "name_en": "Bay Blue", "hex": "#3C9BC9", "role": "end"}
+      ]
+    },
+    {
+      "id": "teal-ember-9",
+      "name": "青橙微光",
+      "name_en": "Teal Ember",
+      "kind": "continuous",
+      "count": 9,
+      "description": "深青经冷白过渡到暖橙的九阶双端渐变，适合中心基准明确的空间场与偏差矩阵。",
+      "source_note": "按用户提供参考图中标注的 HEX 与 RGB 顺序录入",
+      "background": "#FAFBFA",
+      "ink": "#263C39",
+      "accent_index": 8,
+      "tags": ["青橙", "双端", "渐变", "连续"],
+      "colors": [
+        {"name": "深潮青", "name_en": "Deep Tide", "hex": "#3B9082", "role": "start"},
+        {"name": "岛屿青", "name_en": "Lagoon Teal", "hex": "#71AAAD", "role": "low"},
+        {"name": "薄荷雾", "name_en": "Mint Mist", "hex": "#CFE0D8", "role": "low"},
+        {"name": "矿物雾", "name_en": "Mineral Mist", "hex": "#DEE0DC", "role": "low"},
+        {"name": "雪雾", "name_en": "Snow Mist", "hex": "#EEF1EE", "role": "center"},
+        {"name": "杏仁浅沙", "name_en": "Apricot Veil", "hex": "#F9E2CB", "role": "center"},
+        {"name": "杏桃沙", "name_en": "Apricot Sand", "hex": "#EFCDB2", "role": "high"},
+        {"name": "暖珊瑚", "name_en": "Warm Coral", "hex": "#EA9C73", "role": "high"},
+        {"name": "赭橙", "name_en": "Burnt Apricot", "hex": "#D98A63", "role": "end"}
+      ]
+    },
+    {
+      "id": "spectrum-diverging-10",
+      "name": "赤蓝光谱",
+      "name_en": "Red Blue Spectrum",
+      "kind": "continuous",
+      "count": 10,
+      "description": "由深红经明黄与浅色中心过渡到深蓝的发散色库，适合正负效应和双向变化。",
+      "source_note": "按用户提供参考图中标注的 RGB 顺序换算为 HEX",
+      "background": "#FAFAFA",
+      "ink": "#28314A",
+      "accent_index": 0,
+      "tags": ["红蓝", "发散", "渐变", "连续"],
+      "colors": [
+        {"name": "深绯红", "name_en": "Deep Crimson", "hex": "#A80326", "role": "start"},
+        {"name": "朱红", "name_en": "Vermilion", "hex": "#DA382A", "role": "low"},
+        {"name": "珊瑚橙", "name_en": "Coral Orange", "hex": "#F67948", "role": "low"},
+        {"name": "杏橙", "name_en": "Apricot Orange", "hex": "#FDB96B", "role": "low"},
+        {"name": "蜜黄", "name_en": "Honey Light", "hex": "#FEE99D", "role": "center"},
+        {"name": "青柠雾", "name_en": "Lime Mist", "hex": "#F4FBD3", "role": "center"},
+        {"name": "冰蓝", "name_en": "Ice Blue", "hex": "#CAE8F2", "role": "high"},
+        {"name": "天空蓝", "name_en": "Sky Blue", "hex": "#92C5DE", "role": "high"},
+        {"name": "钴蓝", "name_en": "Cobalt Blue", "hex": "#5C90C2", "role": "high"},
+        {"name": "深群青", "name_en": "Deep Ultramarine", "hex": "#3951A2", "role": "end"}
+      ]
+    },
+    {
+      "id": "arctic-crimson-10",
+      "name": "冰火发散",
+      "name_en": "Arctic Crimson",
+      "kind": "continuous",
+      "count": 10,
+      "description": "深海蓝经近白中心过渡到酒红的经典双端渐变，适合相关性、残差和效应方向。",
+      "source_note": "按用户提供参考图中标注的 RGB 顺序换算为 HEX",
+      "background": "#FBFBFC",
+      "ink": "#273246",
+      "accent_index": 8,
+      "tags": ["蓝红", "发散", "渐变", "连续"],
+      "colors": [
+        {"name": "深海蓝", "name_en": "Deep Ocean", "hex": "#104680", "role": "start"},
+        {"name": "钴湖蓝", "name_en": "Cobalt Lake", "hex": "#317CB7", "role": "low"},
+        {"name": "湖水蓝", "name_en": "Lake Blue", "hex": "#6DADD1", "role": "low"},
+        {"name": "浅冰蓝", "name_en": "Pale Ice", "hex": "#B6D7E8", "role": "low"},
+        {"name": "蓝白雾", "name_en": "Blue White", "hex": "#E9F1F4", "role": "center"},
+        {"name": "桃白", "name_en": "Peach White", "hex": "#FBE3D5", "role": "center"},
+        {"name": "浅桃红", "name_en": "Pale Peach", "hex": "#F6B293", "role": "high"},
+        {"name": "砖珊瑚", "name_en": "Brick Coral", "hex": "#DC6D57", "role": "high"},
+        {"name": "绯红", "name_en": "Crimson", "hex": "#B72230", "role": "high"},
+        {"name": "酒红", "name_en": "Wine Red", "hex": "#6D011F", "role": "end"}
+      ]
+    },
+    {
+      "id": "teal-ochre-10",
+      "name": "松石赭石",
+      "name_en": "Teal Ochre",
+      "kind": "continuous",
+      "count": 10,
+      "description": "深松石青经浅色中心过渡到赭石棕的双端渐变，适合生态、地理和环境变量偏差。",
+      "source_note": "按用户提供参考图中标注的 RGB 顺序换算为 HEX",
+      "background": "#FAFBF9",
+      "ink": "#263934",
+      "accent_index": 7,
+      "tags": ["青棕", "自然", "发散", "连续"],
+      "colors": [
+        {"name": "深松石", "name_en": "Deep Spruce", "hex": "#004D43", "role": "start"},
+        {"name": "松针青", "name_en": "Pine Teal", "hex": "#1A7E76", "role": "low"},
+        {"name": "水青", "name_en": "Aqua Teal", "hex": "#5DB3A9", "role": "low"},
+        {"name": "薄荷青", "name_en": "Mint Aqua", "hex": "#A9DDD5", "role": "low"},
+        {"name": "青白", "name_en": "Aqua White", "hex": "#E4F1EF", "role": "center"},
+        {"name": "奶油白", "name_en": "Cream White", "hex": "#F5ECD2", "role": "center"},
+        {"name": "沙金", "name_en": "Sand Gold", "hex": "#E4CB8E", "role": "high"},
+        {"name": "赭石", "name_en": "Ochre", "hex": "#C58E3C", "role": "high"},
+        {"name": "焦糖棕", "name_en": "Umber", "hex": "#94580F", "role": "high"},
+        {"name": "深土棕", "name_en": "Deep Earth", "hex": "#593205", "role": "end"}
+      ]
+    },
+    {
+      "id": "aqua-apricot-4",
+      "name": "浅青暖橘",
+      "name_en": "Aqua Apricot",
+      "kind": "categorical",
+      "count": 4,
+      "description": "浅青、暖米、青蓝与橙橘构成的清爽冷暖组合，适合少类别对比、重点标注和论文概览图。",
+      "source_note": "按用户本轮提供的科研配色参考图录入，拓展色带按原图分组保留",
+      "background": "#FBFCFC",
+      "ink": "#334155",
+      "accent_index": 3,
+      "tags": ["青橙", "少类别", "冷暖平衡", "含拓展色"],
+      "colors": [
+        {"name": "浅青", "name_en": "Pale Aqua", "hex": "#D6F0F1", "role": "support"},
+        {"name": "暖米", "name_en": "Warm Rice", "hex": "#F9E8D4", "role": "support"},
+        {"name": "青蓝", "name_en": "Aqua Blue", "hex": "#4EA8C0", "role": "primary"},
+        {"name": "橙橘", "name_en": "Apricot Orange", "hex": "#FFA453", "role": "highlight"}
+      ],
+      "extension_groups": [
+        {
+          "id": "aqua-scale",
+          "name": "青蓝系",
+          "name_en": "Aqua scale",
+          "colors": [
+            {"name": "青蓝一阶", "name_en": "Aqua 1", "hex": "#E9F6F7", "role": "extension"},
+            {"name": "青蓝二阶", "name_en": "Aqua 2", "hex": "#BDE2EA", "role": "extension"},
+            {"name": "青蓝三阶", "name_en": "Aqua 3", "hex": "#4EABC0", "role": "extension"},
+            {"name": "青蓝四阶", "name_en": "Aqua 4", "hex": "#2F7F95", "role": "extension"},
+            {"name": "青蓝五阶", "name_en": "Aqua 5", "hex": "#1B5666", "role": "extension"}
+          ]
+        },
+        {
+          "id": "apricot-scale",
+          "name": "橙橘系",
+          "name_en": "Apricot scale",
+          "colors": [
+            {"name": "橙橘一阶", "name_en": "Apricot 1", "hex": "#FFF1E2", "role": "extension"},
+            {"name": "橙橘二阶", "name_en": "Apricot 2", "hex": "#FFD7B3", "role": "extension"},
+            {"name": "橙橘三阶", "name_en": "Apricot 3", "hex": "#FFA453", "role": "extension"},
+            {"name": "橙橘四阶", "name_en": "Apricot 4", "hex": "#E67E22", "role": "extension"},
+            {"name": "橙橘五阶", "name_en": "Apricot 5", "hex": "#B55516", "role": "extension"}
+          ]
+        },
+        {
+          "id": "neutral-scale",
+          "name": "中性色",
+          "name_en": "Neutral scale",
+          "colors": [
+            {"name": "中性一阶", "name_en": "Neutral 1", "hex": "#F7F7F7", "role": "extension"},
+            {"name": "中性二阶", "name_en": "Neutral 2", "hex": "#E5E7EB", "role": "extension"},
+            {"name": "中性三阶", "name_en": "Neutral 3", "hex": "#CBD5E1", "role": "extension"},
+            {"name": "中性四阶", "name_en": "Neutral 4", "hex": "#64748B", "role": "extension"},
+            {"name": "中性五阶", "name_en": "Neutral 5", "hex": "#334155", "role": "extension"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coral-mist-6",
+      "name": "珊瑚雾蓝",
+      "name_en": "Coral Mist",
+      "kind": "continuous",
+      "count": 6,
+      "description": "由柔珊瑚经杏粉、浅绿过渡到雾蓝的六阶连续色库，适合有序分组、堆叠构成和温和热图。",
+      "source_note": "按用户本轮提供的科研配色参考图中 HEX 顺序录入",
+      "background": "#FCFBFA",
+      "ink": "#3C454B",
+      "accent_index": 0,
+      "tags": ["珊瑚", "雾蓝", "柔和", "连续"],
+      "colors": [
+        {"name": "珊瑚红", "name_en": "Soft Coral", "hex": "#F0A3A0", "role": "start"},
+        {"name": "浅珊瑚", "name_en": "Pale Coral", "hex": "#F5B8B0", "role": "low"},
+        {"name": "杏粉", "name_en": "Apricot Blush", "hex": "#F9D8C4", "role": "low"},
+        {"name": "芽绿", "name_en": "Bud Green", "hex": "#DDE6CD", "role": "center"},
+        {"name": "雾薄荷", "name_en": "Mint Mist", "hex": "#B8D1C8", "role": "high"},
+        {"name": "雾蓝", "name_en": "Mist Blue", "hex": "#A2C2D2", "role": "end"}
+      ]
+    },
+    {
+      "id": "teal-coral-scale-7",
+      "name": "青珊瑚阶",
+      "name_en": "Teal Coral Scale",
+      "kind": "continuous",
+      "count": 7,
+      "description": "从湖青经柔粉过渡到明亮珊瑚的七阶连续色库，适合双向变化、时序响应和相关矩阵。",
+      "source_note": "按用户本轮提供的科研配色参考图中 HEX 顺序录入",
+      "background": "#FFFBFA",
+      "ink": "#273840",
+      "accent_index": 6,
+      "tags": ["青珊瑚", "双端", "渐变", "连续"],
+      "colors": [
+        {"name": "湖青", "name_en": "Lake Teal", "hex": "#56A0AB", "role": "start"},
+        {"name": "浅湖青", "name_en": "Pale Lake", "hex": "#86B9C3", "role": "low"},
+        {"name": "贝壳粉", "name_en": "Shell Blush", "hex": "#E6CBC6", "role": "low"},
+        {"name": "柔粉", "name_en": "Soft Blush", "hex": "#F2BAB7", "role": "center"},
+        {"name": "陶粉", "name_en": "Clay Blush", "hex": "#D69B95", "role": "high"},
+        {"name": "珊瑚砖", "name_en": "Coral Brick", "hex": "#C97064", "role": "high"},
+        {"name": "亮珊瑚", "name_en": "Bright Coral", "hex": "#FF7C66", "role": "end"}
+      ]
+    },
+    {
+      "id": "teal-grey-apricot-7",
+      "name": "青灰暖橘",
+      "name_en": "Teal Grey Apricot",
+      "kind": "continuous",
+      "count": 7,
+      "description": "深青灰经浅青与中性灰过渡到陶橘、杏粉和暖白，适合机制图、流程图与连续构成展示。",
+      "source_note": "按用户本轮提供的“青灰暖橘”科研绘图配色参考图录入",
+      "background": "#FCFBFA",
+      "ink": "#2F4546",
+      "accent_index": 4,
+      "tags": ["青灰", "暖橘", "自然", "连续"],
+      "colors": [
+        {"name": "深青灰", "name_en": "Deep Teal Grey", "hex": "#58878A", "role": "start"},
+        {"name": "浅青", "name_en": "Pale Teal", "hex": "#ACD0D4", "role": "low"},
+        {"name": "冰青", "name_en": "Icy Teal", "hex": "#CFE3E4", "role": "low"},
+        {"name": "中性灰", "name_en": "Natural Grey", "hex": "#D1D1C4", "role": "center"},
+        {"name": "陶橘", "name_en": "Terracotta", "hex": "#CC8264", "role": "high"},
+        {"name": "杏粉", "name_en": "Apricot Blush", "hex": "#ECBEAA", "role": "high"},
+        {"name": "暖纸白", "name_en": "Warm Paper", "hex": "#FCEBE2", "role": "end"}
+      ]
+    },
+    {
+      "id": "mist-blue-terracotta-10",
+      "name": "雾蓝陶橙",
+      "name_en": "Mist Blue Terracotta",
+      "kind": "continuous",
+      "count": 10,
+      "description": "从克制的雾蓝过渡到陶土橙红的十阶发散色带；移除近白中心节点，使中点数据在白色画布上仍保持可见，适合百分比热力图、偏差矩阵、相关性与双向效应展示。",
+      "source_note": "依据用户提供的 AI Slop Bench V1 热力图截图，从多个带百分比标注的单元格背景取样重建；为避免中点数据与白色画布混淆，按用户要求移除原 50% 近白节点；受截图缩放与压缩影响，颜色为近似值",
+      "background": "#FFFFFF",
+      "ink": "#27313A",
+      "accent_index": 9,
+      "tags": ["雾蓝", "陶橙", "发散", "热力图", "连续"],
+      "colors": [
+        {"name": "深雾蓝", "name_en": "Deep Mist Blue", "hex": "#9FB8CA", "role": "start"},
+        {"name": "雾蓝", "name_en": "Mist Blue", "hex": "#B0C5D2", "role": "low"},
+        {"name": "浅雾蓝", "name_en": "Pale Mist Blue", "hex": "#C1D2DE", "role": "low"},
+        {"name": "冰灰蓝", "name_en": "Icy Blue Grey", "hex": "#D6E0E8", "role": "low"},
+        {"name": "云灰蓝", "name_en": "Cloud Blue Grey", "hex": "#E6ECF1", "role": "low"},
+        {"name": "贝壳灰粉", "name_en": "Shell Blush", "hex": "#F1D9D1", "role": "high"},
+        {"name": "浅陶粉", "name_en": "Pale Terracotta", "hex": "#EAB9A8", "role": "high"},
+        {"name": "陶杏", "name_en": "Terracotta Apricot", "hex": "#E3987D", "role": "high"},
+        {"name": "陶土橙", "name_en": "Terracotta Orange", "hex": "#E07452", "role": "high"},
+        {"name": "深陶橙", "name_en": "Deep Terracotta", "hex": "#D9542B", "role": "end"}
+      ]
+    },
+    {
+      "id": "mint-rose-6",
+      "name": "薄荷玫瑰",
+      "name_en": "Mint Rose",
+      "kind": "continuous",
+      "count": 6,
+      "description": "从清透薄荷青经柔和浅青、浅粉过渡到玫瑰粉的六阶连续色带，适合特征效应散点、依赖图、双向变化和连续数值编码；不含近白中心色，保证中点数据在白色画布上可见。",
+      "source_note": "依据用户提供的多面板特征效应图，从四排重复色条、散点和趋势线分别取样重建；主色带排除原图近白中心，灰酒红 LOWESS 趋势线作为拓展色保留；受低分辨率与压缩影响，颜色为近似值",
+      "background": "#FFFFFF",
+      "ink": "#3F4847",
+      "accent_index": 5,
+      "tags": ["薄荷青", "玫瑰粉", "双端", "特征效应", "连续", "含拓展色"],
+      "colors": [
+        {"name": "清薄荷", "name_en": "Clear Mint", "hex": "#66C5B0", "role": "start"},
+        {"name": "水薄荷", "name_en": "Aqua Mint", "hex": "#8ED3C4", "role": "low"},
+        {"name": "薄荷雾", "name_en": "Mint Mist", "hex": "#BBE0D7", "role": "low"},
+        {"name": "玫瑰雾", "name_en": "Rose Mist", "hex": "#FCC7CC", "role": "high"},
+        {"name": "柔玫瑰", "name_en": "Soft Rose", "hex": "#FAACB8", "role": "high"},
+        {"name": "亮玫粉", "name_en": "Bright Rose", "hex": "#F892A2", "role": "end"}
+      ],
+      "extension_groups": [
+        {
+          "id": "trend-and-annotation",
+          "name": "趋势线与标注",
+          "name_en": "Trend and annotation",
+          "colors": [
+            {"name": "灰酒红", "name_en": "Dusty Wine", "hex": "#A86F78", "role": "trend"},
+            {"name": "深薄荷", "name_en": "Deep Mint", "hex": "#3F9789", "role": "annotation"},
+            {"name": "石墨灰", "name_en": "Graphite", "hex": "#4A5351", "role": "annotation"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "icy-blue-levels-4",
+      "name": "冰蓝层阶",
+      "name_en": "Icy Blue Levels",
+      "kind": "categorical",
+      "count": 4,
+      "description": "由近白冰蓝、浅雾蓝、柔和天蓝和灰调长春花蓝构成的四级有序分类色，适合分组柱状图、箱线图和带散点的统计比较；建议搭配对应深色描边使用。",
+      "source_note": "依据用户提供的 G1–G4 分组柱状图，从右上角图例和三组重复柱体取样重建；主色为柱体填充色，拓展组为按原图轮廓与散点估计的对应描边色；受低分辨率与抗锯齿影响，颜色为近似值",
+      "background": "#FFFFFF",
+      "ink": "#303943",
+      "accent_index": 3,
+      "tags": ["冰蓝", "单色层阶", "有序类别", "柱状图", "含拓展色"],
+      "colors": [
+        {"name": "冰晶白蓝", "name_en": "Crystal Ice", "hex": "#F0F3F9", "role": "group-1"},
+        {"name": "浅雾蓝", "name_en": "Pale Mist Blue", "hex": "#E4F1F9", "role": "group-2"},
+        {"name": "柔天蓝", "name_en": "Soft Sky Blue", "hex": "#C1DCEF", "role": "group-3"},
+        {"name": "灰长春花", "name_en": "Grey Periwinkle", "hex": "#A5B1D7", "role": "group-4"}
+      ],
+      "extension_groups": [
+        {
+          "id": "matched-outlines",
+          "name": "对应描边色",
+          "name_en": "Matched outlines",
+          "colors": [
+            {"name": "冰蓝描边", "name_en": "Ice Outline", "hex": "#C9DDEB", "role": "outline"},
+            {"name": "雾蓝描边", "name_en": "Mist Outline", "hex": "#A9C9E8", "role": "outline"},
+            {"name": "天蓝描边", "name_en": "Sky Outline", "hex": "#7D9FD0", "role": "outline"},
+            {"name": "长春花描边", "name_en": "Periwinkle Outline", "hex": "#596FA5", "role": "outline"}
+          ]
+        }
+      ]
+    },
+    {
+      "id": "coral-aqua-navy-4",
+      "name": "珊瑚青岚",
+      "name_en": "Coral Aqua Navy",
+      "kind": "categorical",
+      "count": 4,
+      "description": "珊瑚红、雾水青、深海军蓝与中性雾灰组成的四分类配色，适合比较草地、水体、城市等对象类别，也适合分组散点图、回归关系图及边际分布图。",
+      "source_note": "依据用户提供的 GST–LST 分组散点回归图，从草地、水体、城市的散点、虚线回归线和边际直方图重复取样重建；中性灰对应空心观测或未分类样本；受手机截图缩放与压缩影响，颜色为近似值",
+      "background": "#FFFFFF",
+      "ink": "#253247",
+      "accent_index": 0,
+      "tags": ["珊瑚红", "雾水青", "海军蓝", "分组散点", "回归", "含拓展色"],
+      "colors": [
+        {"name": "珊瑚草地", "name_en": "Coral Grass", "hex": "#E65462", "role": "primary"},
+        {"name": "雾水青", "name_en": "Misty Water", "hex": "#B5D8DA", "role": "primary"},
+        {"name": "深海军蓝", "name_en": "Deep Urban Navy", "hex": "#495C78", "role": "primary"},
+        {"name": "中性雾灰", "name_en": "Neutral Mist", "hex": "#E8E8E6", "role": "support"}
+      ],
+      "extension_groups": [
+        {
+          "id": "regression-and-bands",
+          "name": "回归线与置信带",
+          "name_en": "Regression lines and bands",
+          "colors": [
+            {"name": "深珊瑚", "name_en": "Deep Coral", "hex": "#B93854", "role": "trend"},
+            {"name": "浅珊瑚带", "name_en": "Pale Coral Band", "hex": "#F8D7DB", "role": "band"},
+            {"name": "深水青", "name_en": "Deep Aqua", "hex": "#7EA3A0", "role": "trend"},
+            {"name": "浅水青带", "name_en": "Pale Aqua Band", "hex": "#E2F1F0", "role": "band"},
+            {"name": "深海军蓝线", "name_en": "Deep Navy Line", "hex": "#263A5A", "role": "trend"},
+            {"name": "浅蓝灰带", "name_en": "Pale Navy Band", "hex": "#DCE3EC", "role": "band"},
+            {"name": "空心点描边", "name_en": "Hollow Point Outline", "hex": "#A6A8A6", "role": "outline"}
+          ]
+        }
+      ]
+    }
+  ]
+}

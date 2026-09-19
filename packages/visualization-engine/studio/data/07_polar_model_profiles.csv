@@ -1,0 +1,6 @@
+model_id,accuracy,robustness,interpretability,speed,scalability,energy_efficiency,maintainability
+1,92,78,68,86,74,91,70
+2,86,94,82,75,88,69,84
+3,89,85,95,72,81,77,90
+4,78,89,76,96,85,82,73
+5,84,81,88,83,93,75,87
