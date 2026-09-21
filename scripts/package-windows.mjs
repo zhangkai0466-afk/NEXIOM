@@ -48,7 +48,7 @@ await rcedit(path.join(destination, "NEXIOM.exe"), {
   "product-version": metadata.version,
   "version-string": {
     CompanyName: "NEXIOM",
-    FileDescription: "NEXIOM Mathematical Modeling Agent",
+    FileDescription: "NEXIOM",
     ProductName: "NEXIOM",
     InternalName: "NEXIOM",
     OriginalFilename: "NEXIOM.exe",

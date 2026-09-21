@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
+import { readFile } from "node:fs/promises";
 import { build } from "esbuild";
 
 const compiled = await build({
@@ -32,12 +33,19 @@ test("release cleanup selects only older valid sibling versions", () => {
         "NEXIOM-0.6.17-win-x64",
         "NEXIOM-0.6.18-win-x64",
         "NEXIOM-0.6.19-win-x64",
+        ".nexiom-update-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+        ".nexiom-previous-37293093-ad7c-4cd7-9c78-73f87478088e",
         "notes",
         "NEXIOM-latest-win-x64",
       ],
       "NEXIOM-0.6.18-win-x64",
     ),
-    ["NEXIOM-0.6.16-win-x64", "NEXIOM-0.6.17-win-x64"],
+    [
+      "NEXIOM-0.6.16-win-x64",
+      "NEXIOM-0.6.17-win-x64",
+      ".nexiom-update-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+      ".nexiom-previous-37293093-ad7c-4cd7-9c78-73f87478088e",
+    ],
   );
   assert.deepEqual(
     obsoleteReleaseDirectoryNames(["NEXIOM-0.6.17-win-x64"], "development"),
@@ -49,6 +57,7 @@ test("release cleanup selects only older valid sibling versions", () => {
         "NEXIOM-0.6.19-win-x64",
         "NEXIOM-0.6.20-win-x64",
         ".nexiom-previous-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+        ".nexiom-update-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
         ".nexiom-update-in-progress",
         "notes",
       ],
@@ -58,6 +67,26 @@ test("release cleanup selects only older valid sibling versions", () => {
       "NEXIOM-0.6.19-win-x64",
       "NEXIOM-0.6.20-win-x64",
       ".nexiom-previous-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+      ".nexiom-update-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+    ],
+  );
+  assert.deepEqual(
+    obsoleteReleaseDirectoryNames(
+      [
+        "NEXIOM-0.6.20-win-x64",
+        "NEXIOM-current-win-x64",
+        ".nexiom-previous-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+        ".nexiom-update-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+        ".nexiom-update-37293093-ad7c-4cd7-9c78-73f87478088e",
+        "notes",
+      ],
+      ".nexiom-update-37293093-ad7c-4cd7-9c78-73f87478088e",
+    ),
+    [
+      "NEXIOM-0.6.20-win-x64",
+      "NEXIOM-current-win-x64",
+      ".nexiom-previous-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
+      ".nexiom-update-2cb21b55-39dc-4c6c-bc74-b8c701ec08df",
     ],
   );
 });
@@ -92,4 +121,14 @@ test("desktop updates reject stale, malformed, and unrelated shortcut targets", 
       ),
     /另一个 NEXIOM 发布目录/,
   );
+});
+
+test("Windows PowerShell update scripts stay ASCII-safe for version 5.1", async () => {
+  for (const file of [
+    "scripts/build-live-update.ps1",
+    "scripts/install-live-update.ps1",
+  ]) {
+    const source = await readFile(file, "utf8");
+    assert.doesNotMatch(source, /[^\x00-\x7f]/, `${file} contains non-ASCII text`);
+  }
 });

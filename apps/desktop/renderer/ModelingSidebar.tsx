@@ -1,19 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Archive, ArchiveRestore, ArrowLeft, BookOpen, ChartNoAxesCombined, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, Eye, EyeOff, FileText, FolderInput, FolderOpen, GitFork, LayoutDashboard, LoaderCircle, MessageSquare, MoreHorizontal, PanelTopOpen, Pencil, Plus, Settings2, ShieldCheck, Table2, Trash2, X } from "lucide-react";
-import type { AccountProfile, ConversationStage, Project, Question, Run, Thread } from "../../../packages/contracts";
+import { Archive, ArchiveRestore, ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, Eye, EyeOff, FileText, FolderInput, FolderOpen, GitFork, LayoutDashboard, LoaderCircle, MessageSquare, MoreHorizontal, PanelTopOpen, Paperclip, Pencil, Plus, Settings2, ShieldCheck, Trash2, X } from "lucide-react";
+import type { AccountProfile, AgentItem, ConversationStage, Project, Question, Run, Thread } from "../../../packages/contracts";
 import { readPreference, writePreference } from "./preferences";
+import { PaperWritingIcon } from "./PaperWritingIcon";
+import { VisualizationIcon } from "./VisualizationIcon";
+import { AgentTaskIcon } from "./AgentTaskStatus";
+import { AGENT_TASK_STATES, getCurrentAgentTaskKind } from "./agent-task-state";
 import logo from "../../../assets/brand/nexiom-desktop-icon-1024.png";
 import "./modeling-navigation.css";
 
 export const dimensions = [
   { id: "overview", label: "项目总览", icon: LayoutDashboard },
   { id: "reading", label: "赛题研读", icon: BookOpen },
-  { id: "attachments", label: "附件分析", icon: Table2 },
+  { id: "attachments", label: "附件分析", icon: Paperclip },
   { id: "model", label: "开始建模", icon: ModelingIcon },
   { id: "validation", label: "模型检验", icon: ShieldCheck },
-  { id: "chart", label: "图表设计", icon: ChartNoAxesCombined },
-  { id: "paper", label: "论文写作", icon: FileText },
+  { id: "chart", label: "图表设计", icon: VisualizationIcon },
+  { id: "paper", label: "论文写作", icon: PaperWritingIcon },
   { id: "delivery", label: "检查交付", icon: ClipboardCheck },
 ] as const;
 export type Dimension = typeof dimensions[number]["id"];
@@ -36,8 +40,14 @@ function ModelingIcon({ size = 18 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="-128 -128 1280 1280" className="modeling-hierarchy-icon" aria-hidden="true"><path d="M896 682.666667V469.333333h-341.333333V341.333333H768V0H256v341.333333h213.333333v128h-341.333333V682.666667H0v341.333333h341.333333V682.666667H213.333333V554.666667h597.333334V682.666667H682.666667v341.333333h341.333333V682.666667h-128zM256 768v170.666667H85.333333V768h170.666667z m85.333333-512V85.333333h341.333334v170.666667H341.333333z m597.333334 682.666667H768V768h170.666667v170.666667z" /></svg>;
 }
 
-export function ModelingSidebar({ projects, project, threads, questions, runs, account, inside, casualSelected, dimension, threadId, busy, onAddProject, onCasualChat, onEnterProject, onRenameProject, onRemoveProject, onBack, onDimension, onThread, onRenameThread, onUnreadThread, onArchiveThread, onDeleteThread, onMoveThread, onCopyThread, onForkThread, onOpenThreadWindow, onAddThread, onSettings, onUpdate }: {
-  projects: Project[]; project?: Project; threads: Thread[]; questions: Question[]; runs: Run[]; account: AccountProfile;
+function SidebarAgentActivity({ run, items }: { run?: Run; items: AgentItem[] }) {
+  if (!run) return null;
+  const kind = getCurrentAgentTaskKind(items, run.id, run.mode === "plan" ? "planning" : "thinking");
+  return <span className="nexiom-task-sidebar-activity" role="img" aria-label={AGENT_TASK_STATES[kind].label} title={AGENT_TASK_STATES[kind].label}><AgentTaskIcon kind={kind} size={12} /></span>;
+}
+
+export function ModelingSidebar({ projects, project, threads, questions, runs, agentItems = [], account, inside, casualSelected, dimension, threadId, busy, onAddProject, onCasualChat, onEnterProject, onRenameProject, onRemoveProject, onBack, onDimension, onThread, onRenameThread, onUnreadThread, onArchiveThread, onDeleteThread, onMoveThread, onCopyThread, onForkThread, onOpenThreadWindow, onAddThread, onSettings, onUpdate }: {
+  projects: Project[]; project?: Project; threads: Thread[]; questions: Question[]; runs: Run[]; agentItems?: AgentItem[]; account: AccountProfile;
   inside: boolean; casualSelected: boolean; dimension: Dimension; threadId: string; busy: boolean;
   onAddProject: () => void; onCasualChat: () => void; onEnterProject: (id: string) => void; onBack: () => void;
   onRenameProject: (project: Project) => void; onRemoveProject: (project: Project) => void;
@@ -269,7 +279,7 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
             const triggerId = `library:${item.id}`;
             const name = projectDisplayName(item);
             return <div className="modeling-project-row" key={item.id}>
-              <button data-project-id={item.id} className="modeling-project" onClick={() => onEnterProject(item.id)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameProject(item); } }}><FolderOpen size={18} /><span>{name}</span>{runs.some((run) => run.projectId === item.id && run.status === "running") && <span className="modeling-running" aria-label="正在运行" />}</button>
+              <button data-project-id={item.id} className="modeling-project" onClick={() => onEnterProject(item.id)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameProject(item); } }}><FolderOpen size={18} /><span>{name}</span><SidebarAgentActivity run={runs.find((run) => run.projectId === item.id && run.status === "running")} items={agentItems} /></button>
               <button className="modeling-project-more" aria-label={`${name}的项目菜单`} aria-haspopup="menu" aria-expanded={projectMenu?.triggerId === triggerId} title="项目菜单" onClick={(event) => openProjectMenu(item, triggerId, event.currentTarget)}><MoreHorizontal size={16} /></button>
             </div>;
           })}
@@ -304,7 +314,7 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
                   const anchor = event.currentTarget.querySelector<HTMLButtonElement>(".modeling-thread-more");
                   if (anchor) openThreadMenu(item, anchor, false, { x: event.clientX, y: event.clientY });
                 }}>
-                  <button className={`modeling-thread ${threadId === item.id ? "active" : ""} ${item.unread ? "unread" : ""}`} aria-current={threadId === item.id ? "page" : undefined} title={[questions.find((question) => question.id === item.questionId)?.name, item.title].filter(Boolean).join(" · ")} onClick={() => onThread(item)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameThread(item); } }}><MessageSquare size={14} /><span>{item.title}</span>{item.unread && <span className="modeling-unread" aria-label="未读" />}{runs.some((run) => run.threadId === item.id && run.status === "running") && <span className="modeling-running" aria-label="正在运行" />}</button>
+                  <button className={`modeling-thread ${threadId === item.id ? "active" : ""} ${item.unread ? "unread" : ""}`} aria-current={threadId === item.id ? "page" : undefined} title={[questions.find((question) => question.id === item.questionId)?.name, item.title].filter(Boolean).join(" · ")} onClick={() => onThread(item)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameThread(item); } }}><MessageSquare size={14} /><span>{item.title}</span>{item.unread && <span className="modeling-unread" aria-label="未读" />}<SidebarAgentActivity run={runs.find((run) => run.threadId === item.id && run.status === "running")} items={agentItems} /></button>
                   <button className="modeling-thread-more" aria-label={`${item.title}的对话菜单`} aria-haspopup="menu" aria-expanded={threadMenu?.thread.id === item.id} aria-controls={threadMenu?.thread.id === item.id ? "modeling-thread-menu" : undefined} title="对话菜单" onClick={(event) => openThreadMenu(item, event.currentTarget)} onKeyDown={(event) => {
                     if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openThreadMenu(item, event.currentTarget, false); }
                     if (event.key === "F2") { event.preventDefault(); onRenameThread(item); }

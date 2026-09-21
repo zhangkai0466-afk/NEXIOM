@@ -19,7 +19,9 @@ export type NativeToolCallItem = {
   result?: unknown;
   error?: { message: string };
 };
-export type ThreadItem = SdkThreadItem | NativeToolCallItem;
+// Work lifecycle only: never carries reasoning text, summaries or model output.
+export type AgentActivityItem = { id: string; type: "agent_activity"; phase: "thinking" };
+export type ThreadItem = SdkThreadItem | NativeToolCallItem | AgentActivityItem;
 export type ThreadEvent =
   | Exclude<SdkThreadEvent, { type: "turn.completed" | "item.started" | "item.updated" | "item.completed" }>
   | { type: "item.started" | "item.updated" | "item.completed"; item: ThreadItem }
@@ -31,6 +33,7 @@ export type ThreadEvent =
       lastInputTokens: number;
       lastOutputTokens: number;
       cachedInputTokens: number;
+      cacheWriteInputTokens: number;
     }
   | { type: "context.compacted"; itemId: string };
 export interface AgentInput {

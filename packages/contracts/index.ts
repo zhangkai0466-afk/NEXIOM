@@ -12,9 +12,10 @@ export const settingsSchema = z.object({
 export type AgentSettings = z.infer<typeof settingsSchema>;
 export const conversationStageSchema = z.enum(["model", "validation", "chart", "paper"]);
 export type ConversationStage = z.infer<typeof conversationStageSchema>;
-export const projectChatStageSchema = z.enum(["overview", "reading", "attachments", "delivery"]);
+export const projectChatStageSchema = z.enum(["reading", "attachments", "delivery"]);
 export type ProjectChatStage = z.infer<typeof projectChatStageSchema>;
 export const threadStageSchema = z.enum([
+  "overview",
   ...projectChatStageSchema.options,
   ...conversationStageSchema.options,
 ]);
@@ -96,6 +97,7 @@ export interface ThreadContext {
   lastInputTokens: number | null;
   lastOutputTokens: number | null;
   cachedInputTokens: number | null;
+  cacheWriteInputTokens: number | null;
   compactions: number;
   updatedAt: string;
 }
@@ -215,7 +217,6 @@ export const commandSchema = z.discriminatedUnion("type", [
     name: z.string().min(1).max(200),
     base64: z.string().max(14000000),
   }),
-  z.object({ type: z.literal("project.inspect"), threadId: z.string().uuid() }),
   z.object({ type: z.literal("run.cancel"), runId: z.string().uuid() }),
 ]);
 
@@ -389,6 +390,7 @@ export interface DesktopBridge {
   whenWindowShown?(): Promise<void>;
   reportStartupComplete?(): void;
   reportFailure?(kind: "react-render" | "script-error" | "unhandled-rejection"): void;
+  setWindowModalState?(open: boolean): void;
   openStartupLogs?(): Promise<void>;
   applyUpdate?(): Promise<DesktopUpdateResult>;
 }

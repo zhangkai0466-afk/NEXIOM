@@ -1,0 +1,53 @@
+.nexiom-pdf {
+  height: 100%; min-height: 0; min-width: 0; display: flex; flex-direction: column;
+  background: var(--panel); color: var(--text); overflow: hidden; container-type: inline-size;
+}
+.nexiom-pdf:fullscreen { width: 100vw; height: 100vh; background: var(--panel); }
+.nexiom-pdf button:not(.nexiom-pdf-thumbnail):not(.nexiom-pdf-sidebar button):not(.pdfViewer button) {
+  flex: 0 0 30px; width: 30px; height: 30px; padding: 0; border-radius: 4px; color: var(--text); background: transparent;
+}
+.nexiom-pdf button:hover:not(:disabled) { background: var(--hover); }
+.nexiom-pdf button[aria-pressed="true"] { background: var(--selected) !important; color: var(--link) !important; }
+.nexiom-pdf button:disabled { opacity: .35; }
+.nexiom-pdf-toolbar { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 6px 10px; padding: 5px 10px; border-bottom: 1px solid var(--border); flex: 0 0 auto; background: var(--surface); }
+.nexiom-pdf-tools-left, .nexiom-pdf-tools-center { display: flex; align-items: center; gap: 8px; }
+.nexiom-pdf-tools-center { justify-content: center; }
+.nexiom-pdf-group { display: flex; align-items: center; gap: 3px; flex: 0 0 auto; }
+.nexiom-pdf-group + .nexiom-pdf-group { border-left: 1px solid var(--border); padding-left: 8px; }
+.nexiom-pdf-actions { margin-left: auto; }
+.nexiom-pdf-group input, .nexiom-pdf-group select, .nexiom-pdf-find > input {
+  height: 28px; padding: 3px 6px; border: 1px solid var(--border); border-radius: 4px; color: var(--text); background: var(--surface); font-size: 12px;
+}
+.nexiom-pdf-group input { width: 48px; text-align: center; }
+.nexiom-pdf-group select { width: 98px; }
+.nexiom-pdf-count { min-width: 27px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.nexiom-pdf-find { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; flex: 0 0 auto; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.nexiom-pdf-find > input { width: 150px; min-width: 90px; flex: 1; }
+.nexiom-pdf-find > span { min-width: 40px; text-align: center; font-size: 12px; color: var(--muted); }
+.nexiom-pdf-find label { display: flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; }
+.nexiom-pdf-notice { font-size: 12px; padding: 6px 12px; color: var(--danger); }
+.nexiom-pdf-body { min-width: 0; min-height: 0; display: flex; flex: 1; }
+.nexiom-pdf-stage { position: relative; min-width: 0; min-height: 0; flex: 1; }
+.nexiom-pdf-scroll { position: absolute; inset: 0; overflow: auto; background: #e6e6e6; overscroll-behavior: contain; }
+:root[data-theme="dark"] .nexiom-pdf-scroll { background: #36383c; }
+.nexiom-pdf-scroll .pdfViewer { padding-block: 12px; }
+.nexiom-pdf-scroll .pdfViewer .page { box-sizing: content-box; }
+.nexiom-pdf-state { position: absolute; inset: 0; display: flex; justify-content: center; align-items: center; gap: 10px; background: var(--surface); padding: 20px; font-size: 13px; }
+.nexiom-pdf-state span { overflow-wrap: anywhere; }
+.nexiom-pdf-sidebar { width: 170px; flex: 0 0 170px; min-height: 0; overflow: auto; padding: 12px; border-right: 1px solid var(--border); }
+.nexiom-pdf-thumbnail { width: 100%; display: flex; flex-direction: column; gap: 6px; align-items: center; padding: 6px; margin-bottom: 12px; border: 1px solid transparent; border-radius: 4px; font-size: 12px; color: var(--muted); }
+.nexiom-pdf-thumbnail.active { border-color: var(--link); background: var(--selected); }
+.nexiom-pdf-thumbnail canvas { width: 130px; max-width: 100%; min-height: 130px; background: white; }
+.nexiom-pdf-sidebar ul { list-style: none; padding: 0; margin: 0; }
+.nexiom-pdf-sidebar ul ul { padding-left: 12px; }
+.nexiom-pdf-sidebar li > button { width: 100%; padding: 7px 4px; text-align: left; justify-content: flex-start; overflow-wrap: anywhere; font-size: 12px; color: var(--text); }
+.nexiom-pdf-sidebar p { font-size: 12px; color: var(--muted); }
+@container (max-width: 820px) {
+  .nexiom-pdf-toolbar { grid-template-columns: 1fr auto; }
+  .nexiom-pdf-tools-center { grid-column: 1 / -1; grid-row: 2; }
+}
+@container (max-width: 480px) {
+  .nexiom-pdf-toolbar { gap: 4px; padding: 5px; }
+  .nexiom-pdf-group + .nexiom-pdf-group { padding-left: 3px; }
+  .nexiom-pdf-sidebar { width: 120px; flex-basis: 120px; padding: 6px; }
+}

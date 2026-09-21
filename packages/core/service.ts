@@ -40,7 +40,6 @@ import {
 const now = () => new Date().toISOString();
 const schemaVersionCurrent = 9;
 const projectChatNames = {
-  overview: "项目总览",
   reading: "赛题研读",
   attachments: "附件分析",
   delivery: "检查交付",
@@ -224,12 +223,11 @@ function initializeProviders(db: DatabaseSync, schemaVersion: number) {
 export class CoreService {
   private db!: DatabaseSync;
   private releaseLease: () => void;
-  private cancelled = new Set<string>();
-  private jobs = new Set<Promise<void>>();
   private closed = false;
   private agent!: AgentCoordinator;
   private dirtyProjectRecords = new Set<string>();
   private projectRecordFailures = new Map<string, string>();
+  private projectRecordTimer: NodeJS.Timeout | undefined;
   constructor(
     private dataDir: string,
     private notify: () => void = () => {},
@@ -304,6 +302,8 @@ export class CoreService {
     this.dirtyProjectRecords.add(projectId);
   }
   private flushProjectRecords() {
+    clearTimeout(this.projectRecordTimer);
+    this.projectRecordTimer = undefined;
     for (const projectId of [...this.dirtyProjectRecords]) {
       try {
         if (!writeProjectRecord(this.db, projectId)) {
@@ -326,8 +326,24 @@ export class CoreService {
       }
     }
   }
-  private publish() {
-    this.flushProjectRecords();
+  private publish(options: { deferProjectRecord?: boolean } = {}) {
+    // SQLite contains the live state. The portable project record is a mirror:
+    // streaming must not synchronously rewrite all history for every delta.
+    // Do not reset this timer on updates: continuous output still checkpoints.
+    if (options.deferProjectRecord && !this.closed) {
+      if (this.dirtyProjectRecords.size && !this.projectRecordTimer) {
+        this.projectRecordTimer = setTimeout(() => {
+          this.projectRecordTimer = undefined;
+          if (this.closed) return;
+          this.flushProjectRecords();
+          this.notify();
+        }, 1000);
+        this.projectRecordTimer.unref();
+      }
+    } else {
+      // Commands, run completion/cancellation and close retain a flush barrier.
+      this.flushProjectRecords();
+    }
     this.notify();
   }
   private project(id: string): Project {
@@ -584,17 +600,12 @@ export class CoreService {
       throw new Error("该目录不对工作区开放。");
     return target;
   }
-  private async files(
-    project: Project,
-    runId?: string,
-  ): Promise<ProjectFile[]> {
+  private async files(project: Project): Promise<ProjectFile[]> {
     const result: ProjectFile[] = [];
     const visit = async (relative: string, depth: number) => {
-      if (runId && this.cancelled.has(runId)) throw new Error("CANCELLED");
       if (depth > 8) return;
       const directory = await this.contained(project, relative);
       for (const entry of await readdir(directory, { withFileTypes: true })) {
-        if (runId && this.cancelled.has(runId)) throw new Error("CANCELLED");
         if (ignored.has(entry.name.toLowerCase()) || entry.isSymbolicLink())
           continue;
         if (result.length >= 1000)
@@ -1077,6 +1088,27 @@ export class CoreService {
         );
         const stat = await lstat(target);
         if (!stat.isFile()) throw new Error("目标不是文件。");
+        const ext = path.extname(target).toLowerCase();
+        if (ext === ".pdf") {
+          if (stat.size > 12 * 1024 * 1024)
+            return {
+              file: {
+                path: command.path,
+                text: null,
+                mime: "large",
+                size: stat.size,
+              },
+            };
+          return {
+            file: {
+              path: command.path,
+              text: null,
+              mime: "application/pdf",
+              size: stat.size,
+              base64: (await readFile(target)).toString("base64"),
+            },
+          };
+        }
         if (stat.size > 2 * 1024 * 1024)
           return {
             file: {
@@ -1086,7 +1118,6 @@ export class CoreService {
               size: stat.size,
             },
           };
-        const ext = path.extname(target).toLowerCase();
         const mime = (
           {
             ".png": "image/png",
@@ -1168,48 +1199,12 @@ export class CoreService {
         this.publish();
         return { importedPath: `inputs/${command.name}` };
       }
-      case "project.inspect": {
-        const thread = this.thread(command.threadId);
-        const project = await this.projectWorkspace(thread.projectId);
-        if (
-          this.db
-            .prepare(
-              "SELECT id FROM runs WHERE projectId=? AND status='running'",
-            )
-            .get(thread.projectId)
-        )
-          throw new Error("此项目已有检查正在运行。");
-        const runId = randomUUID();
-        this.transaction(() => {
-          this.db
-            .prepare("INSERT INTO runs VALUES (?, ?, ?, ?, ?, NULL)")
-            .run(runId, thread.id, thread.projectId, "running", now());
-          this.message(
-            thread.id,
-            "assistant",
-            "progress",
-            "检查项目目录与附件，整理当前文件清单。",
-          );
-          this.event(
-            thread.projectId,
-            "tool.started",
-            "workspace.inspect · 读取项目文件",
-            runId,
-          );
-        });
-        const job = this.inspect(runId, thread, project);
-        this.jobs.add(job);
-        void job.finally(() => this.jobs.delete(job));
-        this.publish();
-        return { ...this.snapshot(), runId };
-      }
       case "run.cancel": {
         const run = this.db
           .prepare("SELECT * FROM runs WHERE id=?")
           .get(command.runId) as unknown as Run | undefined;
         if (!run) throw new Error("运行不存在。");
         if (run.status === "running") {
-          this.cancelled.add(run.id);
           this.agent.cancel(run.id);
         }
         return this.snapshot();
@@ -1217,70 +1212,10 @@ export class CoreService {
     }
   }
 
-  private async inspect(runId: string, thread: Thread, project: Project) {
-    try {
-      const files = await this.files(project, runId);
-      if (this.cancelled.has(runId)) throw new Error("CANCELLED");
-      const datasets = files.filter((f) =>
-        [".csv", ".tsv", ".xlsx", ".xls"].includes(f.extension),
-      );
-      const documents = files.filter((f) =>
-        [".pdf", ".docx", ".md", ".txt"].includes(f.extension),
-      );
-      this.transaction(() => {
-        this.db
-          .prepare(
-            "UPDATE runs SET status='succeeded', finishedAt=? WHERE id=?",
-          )
-          .run(now(), runId);
-        this.event(
-          thread.projectId,
-          "tool.completed",
-          `workspace.inspect · 找到 ${files.length} 个文件、${datasets.length} 份数据附件`,
-          runId,
-        );
-        this.message(
-          thread.id,
-          "assistant",
-          "answer",
-          `项目检查完成。\n\n当前可见范围内共 ${files.length} 个文件，其中数据附件 ${datasets.length} 份，文档 ${documents.length} 份。${
-            files.length
-              ? "\n\n" +
-                files
-                  .slice(0, 12)
-                  .map((f) => f.path)
-                  .join("\n")
-              : ""
-          }\n\n本次仅核对文件清单，未解析文档内容、验证数据或调用模型。扫描最多 8 层目录，忽略依赖、隐藏工作目录及符号链接。`,
-        );
-      });
-    } catch (error) {
-      const cancelled = this.cancelled.has(runId);
-      const status = cancelled ? "cancelled" : "failed";
-      const summary = cancelled
-        ? "项目检查已取消。"
-        : `项目检查失败：${(error as Error).message}`;
-      this.transaction(() => {
-        this.db
-          .prepare("UPDATE runs SET status=?, finishedAt=? WHERE id=?")
-          .run(status, now(), runId);
-        this.event(thread.projectId, `tool.${status}`, summary, runId);
-        this.message(thread.id, "assistant", "answer", summary);
-      });
-    } finally {
-      this.cancelled.delete(runId);
-      this.publish();
-    }
-  }
   async close() {
     if (this.closed) return;
     this.closed = true;
-    for (const run of this.db
-      .prepare("SELECT id FROM runs WHERE status='running'")
-      .all())
-      this.cancelled.add(String(run.id));
     await this.agent.close();
-    await Promise.allSettled(this.jobs);
     this.flushProjectRecords();
     this.db.close();
     this.releaseLease();

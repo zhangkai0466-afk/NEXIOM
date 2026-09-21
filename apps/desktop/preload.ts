@@ -42,6 +42,7 @@ const bridge: DesktopBridge & {
   whenWindowShown: () => ipcRenderer.invoke("desktop:when-window-shown"),
   reportStartupComplete: () => ipcRenderer.send("desktop:startup-complete"),
   reportFailure: (kind) => ipcRenderer.send("desktop:failure", kind),
+  setWindowModalState: (open) => ipcRenderer.send("desktop:modal-state", open),
   openStartupLogs: () => ipcRenderer.invoke("desktop:open-logs"),
   applyUpdate: () => ipcRenderer.invoke("desktop:apply-update"),
   getTheme: () => ipcRenderer.invoke("appearance:get"),

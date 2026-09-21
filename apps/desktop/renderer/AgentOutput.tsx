@@ -7,17 +7,17 @@ import rehypeKatex from "rehype-katex";
 import {
   Check,
   ChevronRight,
-  CircleCheck,
   Copy,
   FileCode2,
   ListChecks,
-  LoaderCircle,
   Search,
   Terminal,
-  TriangleAlert,
 } from "lucide-react";
 import type { AgentItem } from "../../../packages/contracts";
 import logo from "../../../assets/brand/nexiom-desktop-icon-1024.png";
+import { AgentTaskStatus } from "./AgentTaskStatus";
+import { getAgentItemOutcome, getAgentTaskKind } from "./agent-task-state";
+import { readingProseTables } from "./reading-prose-tables";
 
 const visualOperationNames: Record<string, string> = {
   health_check: "检查绘图环境",
@@ -42,9 +42,11 @@ const visualOperationNames: Record<string, string> = {
 export function RichText({
   text,
   openFile,
+  reading = false,
 }: {
   text: string;
   openFile?: (path: string) => void;
+  reading?: boolean;
 }) {
   return (
     <div className="markdown">
@@ -56,9 +58,16 @@ export function RichText({
             ? url
             : ""
         }
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={reading ? [remarkGfm, remarkMath, readingProseTables] : [remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={{
+          table({ children }) {
+            return (
+              <div className="markdown-table-frame">
+                <table>{children}</table>
+              </div>
+            );
+          },
           a({ href, children }) {
             if (href && !/^(https?:|mailto:|#)/i.test(href) && openFile)
               return (
@@ -89,9 +98,11 @@ export function RichText({
 export const AgentOutput = memo(function AgentOutput({
   record,
   openFile,
+  showProgress = true,
 }: {
   record: AgentItem;
   openFile: (path: string) => void;
+  showProgress?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -101,19 +112,22 @@ export const AgentOutput = memo(function AgentOutput({
     return () => clearTimeout(timer);
   }, [copied]);
   const item = record.item;
+  const outcome = getAgentItemOutcome(record);
+  const running = outcome === "running";
+  const showStatus = showProgress || !running;
   if (item.type === "agent_message")
     return (
       <article
-        className={`agent-answer ${record.status === "running" ? "streaming" : ""}`}
-        aria-busy={record.status === "running"}
+        className={`agent-answer ${running ? "streaming" : ""}`}
+        aria-busy={running}
       >
         <div className="agent-signature">
           <img src={logo} alt="" />
           <strong>NEXIOM</strong>
         </div>
         <RichText text={item.text} openFile={openFile} />
-        {record.status === "running" && (
-          <span className="stream-cursor" aria-hidden="true" />
+        {showStatus && outcome !== "completed" && (
+          <AgentTaskStatus kind="writing" status={outcome} compact className="nexiom-task-streaming" />
         )}
         <button
           className="icon-button copy-answer"
@@ -132,13 +146,14 @@ export const AgentOutput = memo(function AgentOutput({
         </button>
       </article>
     );
-  if (item.type === "reasoning") return null;
+  if (item.type === "reasoning" || item.type === "agent_activity") return null;
   if (item.type === "todo_list")
     return (
       <div className="agent-plan">
         <div>
           <ListChecks size={15} />
           任务计划
+          {showStatus && <AgentTaskStatus kind="planning" status={outcome} compact className="nexiom-task-plan-status" />}
         </div>
         {item.items.map((step, index) => (
           <p key={index} className={step.completed ? "done" : ""}>
@@ -152,11 +167,7 @@ export const AgentOutput = memo(function AgentOutput({
         ))}
       </div>
     );
-  const failure =
-    ("status" in item && item.status === "failed") ||
-    record.status === "interrupted" ||
-    item.type === "error";
-  const running = record.status === "running";
+  const failure = outcome === "failed";
   const title =
     item.type === "command_execution"
       ? `运行命令${item.exit_code !== undefined ? ` · 退出码 ${item.exit_code}` : ""}`
@@ -192,13 +203,7 @@ export const AgentOutput = memo(function AgentOutput({
         />
         <Icon size={15} />
         <span>{title}</span>
-        {running ? (
-          <LoaderCircle size={14} className="spin" />
-        ) : failure ? (
-          <TriangleAlert size={14} />
-        ) : (
-          <CircleCheck size={14} />
-        )}
+        {showStatus && <AgentTaskStatus kind={getAgentTaskKind(item)} status={outcome} compact />}
       </button>
       <AnimatePresence initial={false}>
         {expanded && (
@@ -217,9 +222,13 @@ export const AgentOutput = memo(function AgentOutput({
                 <div className="tool-meta">
                   {item.exit_code !== undefined
                     ? `退出码 ${item.exit_code}`
-                    : record.status === "interrupted"
+                    : outcome === "interrupted"
                       ? "已中断，未确认退出码"
-                      : "运行中"}
+                      : outcome === "cancelled"
+                        ? "已停止，未确认退出码"
+                        : outcome === "failed"
+                          ? "失败，未返回退出码"
+                          : running ? "运行中" : "完成"}
                 </div>
               </>
             )}

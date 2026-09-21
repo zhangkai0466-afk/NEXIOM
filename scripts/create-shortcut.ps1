@@ -42,7 +42,7 @@ try {
     $shortcut.TargetPath = $resolvedExecutable
     $shortcut.WorkingDirectory = $applicationDirectory
     $shortcut.IconLocation = "$iconPath,0"
-    $shortcut.Description = 'NEXIOM - Mathematical Modeling Agent'
+    $shortcut.Description = 'NEXIOM'
     $shortcut.WindowStyle = 1
     $shortcut.Save()
     Write-Output $shortcutPath

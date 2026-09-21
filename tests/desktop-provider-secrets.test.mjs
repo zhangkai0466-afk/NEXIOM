@@ -72,6 +72,7 @@ async function desktopHarness(t, options) {
   app.quit = () => {};
   app.requestSingleInstanceLock = () => true;
   app.setAppUserModelId = () => {};
+  app.setName = () => {};
   app.setPath = () => {};
   app.whenReady = () => Promise.resolve();
 

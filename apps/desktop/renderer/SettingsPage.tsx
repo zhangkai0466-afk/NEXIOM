@@ -58,7 +58,7 @@ const categories = [
     group: "Agent",
     icon: SlidersHorizontal,
     terms:
-      "连接方式 连接状态 API 地址 Key 密钥 Responses 模型名称 推理强度",
+      "连接方式 连接状态 API 地址 Key 密钥 Responses 模型名称 模型 ID 推理强度",
   },
   {
     id: "memory",
@@ -220,7 +220,7 @@ export function SettingsPage({
               <span className="settings-row-copy">
                 <strong>允许程序联网</strong>
                 <span>
-                  允许执行任务中的程序访问网络，例如获取数据。模型连接不受此设置影响。
+                  允许研读时检索文献，以及执行任务中的程序访问网络。模型连接不受此设置影响。
                 </span>
               </span>
               <input

@@ -29,8 +29,11 @@ import { spawn } from "node:child_process";
 import { startupLogger } from "./startup-log";
 import { obsoleteReleaseDirectoryNames } from "./update";
 
+app.setName("NEXIOM");
+
 let window: BrowserWindow | null = null;
 const threadWindows = new Set<BrowserWindow>();
+const modalWindowIds = new Set<number>();
 let tray: Tray | null = null;
 let worker: ReturnType<typeof utilityProcess.fork>;
 let alive = false;
@@ -132,7 +135,6 @@ async function findUpdateSourceRoot() {
       const manifest = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
       if (manifest.name !== "nexiom") continue;
       await access(path.join(root, "scripts/build-live-update.ps1"));
-      await access(path.join(root, "scripts/install-live-update.ps1"));
       await access(path.join(root, "scripts/package-windows.mjs"));
       return root;
     } catch {
@@ -184,36 +186,35 @@ async function buildAndScheduleUpdate() {
     throw new Error(`构建最新 NEXIOM 失败：${detail}`);
   }
 
-  const installer = spawn(
-    "powershell.exe",
-    [
-      "-NoProfile",
-      "-NonInteractive",
-      "-ExecutionPolicy",
-      "Bypass",
-      "-File",
-      path.join(sourceRoot, "scripts/install-live-update.ps1"),
-      "-SourceRoot",
-      sourceRoot,
-      "-StagingDirectory",
-      staging,
-      "-CurrentProcessId",
-      String(process.pid),
-      "-CurrentDirectory",
-      path.dirname(process.execPath),
-    ],
-    { cwd: sourceRoot, detached: true, windowsHide: true, stdio: "ignore" },
-  );
-  await new Promise<void>((resolve, reject) => {
-    installer.once("spawn", resolve);
-    installer.once("error", reject);
-  }).catch(async (error) => {
+  const executable = path.join(staging, "NEXIOM.exe");
+  const shortcutPath = path.join(app.getPath("desktop"), "NEXIOM.lnk");
+  let previousShortcut: ReturnType<typeof shell.readShortcutLink> | null = null;
+  try {
+    previousShortcut = shell.readShortcutLink(shortcutPath);
+  } catch {
+    // A missing shortcut is created below.
+  }
+  const shortcutWritten = shell.writeShortcutLink(shortcutPath, "replace", {
+    target: executable,
+    cwd: staging,
+    icon: path.join(staging, "resources/app/assets/brand/nexiom-desktop-icon.ico"),
+    iconIndex: 0,
+    description: "NEXIOM",
+  });
+  if (!shortcutWritten) {
+    await rm(staging, { recursive: true, force: true }).catch(() => {});
+    throw new Error("无法更新桌面快捷方式，当前 NEXIOM 已保留运行。");
+  }
+  try {
+    app.relaunch({ execPath: executable, args: [] });
+  } catch (error) {
+    if (previousShortcut)
+      shell.writeShortcutLink(shortcutPath, "replace", previousShortcut);
     await rm(staging, { recursive: true, force: true }).catch(() => {});
     throw error;
-  });
-  installer.unref();
+  }
   startup.log("source-update-ready", { sourceRoot });
-  setTimeout(() => app.quit(), 120);
+  setTimeout(() => app.quit(), 250);
   return { targetVersion: app.getVersion() };
 }
 function showStartupWindow(reason: string) {
@@ -312,6 +313,23 @@ function startupThemeColors() {
 function windowThemeColors() {
   return startupAnimationActive ? startupThemeColors() : themeColors();
 }
+function dimChromeColor(color: string) {
+  const channels = color.slice(1).match(/.{2}/g);
+  if (!channels || channels.length !== 3) return color;
+  return `#${channels
+    .map((channel) => Math.round(Number.parseInt(channel, 16) * (7 / 15)).toString(16).padStart(2, "0"))
+    .join("")}`;
+}
+function syncBrowserWindowChrome(target: BrowserWindow, colors: ReturnType<typeof themeColors>) {
+  target.setBackgroundColor(colors.background);
+  if (process.platform !== "win32") return;
+  const modalOpen = modalWindowIds.has(target.id);
+  target.setTitleBarOverlay({
+    color: modalOpen ? dimChromeColor(colors.titlebar) : colors.titlebar,
+    symbolColor: modalOpen ? dimChromeColor(colors.symbol) : colors.symbol,
+    height: 36,
+  });
+}
 function finishStartupAnimation() {
   if (!startupAnimationActive) return;
   startupAnimationActive = false;
@@ -319,14 +337,7 @@ function finishStartupAnimation() {
 }
 function syncWindowChrome() {
   if (!window || window.isDestroyed()) return;
-  const colors = windowThemeColors();
-  window.setBackgroundColor(colors.background);
-  if (process.platform === "win32")
-    window?.setTitleBarOverlay({
-      color: colors.titlebar,
-      symbolColor: colors.symbol,
-      height: 36,
-    });
+  syncBrowserWindowChrome(window, windowThemeColors());
 }
 function syncWindowTheme() {
   if (!window || window.isDestroyed()) return;
@@ -335,8 +346,7 @@ function syncWindowTheme() {
   const colors = themeColors();
   for (const child of threadWindows) {
     if (child.isDestroyed()) continue;
-    child.setBackgroundColor(colors.background);
-    if (process.platform === "win32") child.setTitleBarOverlay({ color: colors.titlebar, symbolColor: colors.symbol, height: 36 });
+    syncBrowserWindowChrome(child, colors);
     child.webContents.send("appearance:changed", themeState());
   }
 }
@@ -361,6 +371,7 @@ function externalWebUrl(input: string): string | null {
     return null;
   }
 }
+
 function request(
   packet: Record<string, unknown>,
   allowDuringSecretRollback = false,
@@ -493,6 +504,15 @@ else {
         clearTimeout(startupTimer);
         showStartupWindow("render-error");
       }
+    });
+    ipcMain.on("desktop:modal-state", (event, open: unknown) => {
+      try { assertSender(event); } catch { return; }
+      if (typeof open !== "boolean") return;
+      const target = BrowserWindow.fromWebContents(event.sender);
+      if (!target || target.isDestroyed()) return;
+      if (open) modalWindowIds.add(target.id);
+      else modalWindowIds.delete(target.id);
+      syncBrowserWindowChrome(target, target === window ? windowThemeColors() : themeColors());
     });
     ipcMain.handle("desktop:open-logs", async (event) => {
       assertSender(event);
@@ -739,9 +759,12 @@ else {
         if (url.split("?")[0] !== pageUrl) navigationEvent.preventDefault();
       });
       child.webContents.on("will-frame-navigate", (navigationEvent) => {
-        if (!navigationEvent.isMainFrame || navigationEvent.url.split("?")[0] !== pageUrl) navigationEvent.preventDefault();
+        if (navigationEvent.url.split("?")[0] !== pageUrl) navigationEvent.preventDefault();
       });
-      child.on("closed", () => threadWindows.delete(child));
+      child.on("closed", () => {
+        modalWindowIds.delete(child.id);
+        threadWindows.delete(child);
+      });
       await child.loadFile(pagePath, { query: { thread: threadId } });
     });
     const colors = windowThemeColors();
@@ -774,7 +797,7 @@ else {
     });
     try {
       tray = new Tray(appIconPath);
-      tray.setToolTip("NEXIOM — Agent 正在后台运行");
+      tray.setToolTip("NEXIOM");
       tray.setContextMenu(Menu.buildFromTemplate([
         { label: "打开 NEXIOM", click: () => showMainWindow("tray-menu") },
         { type: "separator" },
@@ -836,7 +859,7 @@ else {
       if (url !== pageUrl) event.preventDefault();
     });
     window.webContents.on("will-frame-navigate", (event) => {
-      if (!event.isMainFrame || event.url !== pageUrl) event.preventDefault();
+      if (event.url !== pageUrl) event.preventDefault();
     });
     window.once("ready-to-show", () => {
       startup.log("ready-to-show");
@@ -847,6 +870,7 @@ else {
     window.showInactive();
     loadApplication();
     window.on("closed", () => {
+      if (window) modalWindowIds.delete(window.id);
       window = null;
       clearTimeout(startupTimer);
       clearTimeout(windowShowTimer);

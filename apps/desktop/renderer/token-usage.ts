@@ -4,6 +4,8 @@ export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
   cachedInputTokens: number;
+  cacheWriteInputTokens: number;
+  ordinaryInputTokens: number;
   totalTokens: number;
 }
 
@@ -13,9 +15,28 @@ export interface UsageDay extends TokenUsage {
   unknownRuns: number;
 }
 
-type UsageRun = Pick<Run, "id" | "createdAt" | "kind" | "usage">;
+type UsageRun = Pick<Run, "id" | "createdAt" | "kind" | "usage" | "runtimeConfig">;
+type CacheThreadState = "new_thread" | "continuation" | "unknown";
 const validCount = (value: unknown): value is number =>
   typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+
+export function tokenRate(numerator: number, denominator: number): number | null {
+  if (!validCount(numerator) || !validCount(denominator) || numerator > denominator || denominator === 0)
+    return null;
+  return numerator / denominator;
+}
+
+function cacheThreadState(raw: string | null | undefined): CacheThreadState {
+  if (!raw) return "unknown";
+  try {
+    const value: unknown = JSON.parse(raw);
+    if (!value || typeof value !== "object" || Array.isArray(value)) return "unknown";
+    const state = (value as Record<string, unknown>).cacheThreadState;
+    return state === "new_thread" || state === "continuation" ? state : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
 
 /** Run usage is a per-turn delta. Cached input is already included in input. */
 export function parseTokenUsage(raw: string | null | undefined): TokenUsage | null {
@@ -26,13 +47,20 @@ export function parseTokenUsage(raw: string | null | undefined): TokenUsage | nu
     const usage = value as Record<string, unknown>;
     if (!validCount(usage.input_tokens) || !validCount(usage.output_tokens)) return null;
     const cachedInputTokens = usage.cached_input_tokens ?? 0;
-    if (!validCount(cachedInputTokens) || cachedInputTokens > usage.input_tokens) return null;
+    const cacheWriteInputTokens = usage.cache_write_input_tokens ?? 0;
+    if (
+      !validCount(cachedInputTokens) ||
+      !validCount(cacheWriteInputTokens) ||
+      cachedInputTokens + cacheWriteInputTokens > usage.input_tokens
+    ) return null;
     const totalTokens = usage.input_tokens + usage.output_tokens;
     if (!Number.isSafeInteger(totalTokens)) return null;
     return {
       inputTokens: usage.input_tokens,
       outputTokens: usage.output_tokens,
       cachedInputTokens,
+      cacheWriteInputTokens,
+      ordinaryInputTokens: usage.input_tokens - cachedInputTokens - cacheWriteInputTokens,
       totalTokens,
     };
   } catch {
@@ -48,6 +76,8 @@ const emptyTokens = (): TokenUsage => ({
   inputTokens: 0,
   outputTokens: 0,
   cachedInputTokens: 0,
+  cacheWriteInputTokens: 0,
+  ordinaryInputTokens: 0,
   totalTokens: 0,
 });
 
@@ -67,6 +97,13 @@ export function aggregateTokenUsage(runs: readonly UsageRun[], now = new Date(),
   }
   const seen = new Set<string>();
   let invalidDateRuns = 0;
+  const cache = {
+    newThreadRuns: 0,
+    continuationRuns: 0,
+    unknownStateRuns: 0,
+    continuationInputTokens: 0,
+    continuationCachedInputTokens: 0,
+  };
   for (const run of runs) {
     if (run.kind !== "agent" || seen.has(run.id)) continue;
     seen.add(run.id);
@@ -86,20 +123,31 @@ export function aggregateTokenUsage(runs: readonly UsageRun[], now = new Date(),
     day.inputTokens += usage.inputTokens;
     day.outputTokens += usage.outputTokens;
     day.cachedInputTokens += usage.cachedInputTokens;
+    day.cacheWriteInputTokens += usage.cacheWriteInputTokens;
+    day.ordinaryInputTokens += usage.ordinaryInputTokens;
     day.totalTokens += usage.totalTokens;
+    const state = cacheThreadState(run.runtimeConfig);
+    if (state === "new_thread") cache.newThreadRuns += 1;
+    else if (state === "continuation") {
+      cache.continuationRuns += 1;
+      cache.continuationInputTokens += usage.inputTokens;
+      cache.continuationCachedInputTokens += usage.cachedInputTokens;
+    } else cache.unknownStateRuns += 1;
   }
   const totals = daily.reduce(
     (sum, day) => ({
       inputTokens: sum.inputTokens + day.inputTokens,
       outputTokens: sum.outputTokens + day.outputTokens,
       cachedInputTokens: sum.cachedInputTokens + day.cachedInputTokens,
+      cacheWriteInputTokens: sum.cacheWriteInputTokens + day.cacheWriteInputTokens,
+      ordinaryInputTokens: sum.ordinaryInputTokens + day.ordinaryInputTokens,
       totalTokens: sum.totalTokens + day.totalTokens,
       knownRuns: sum.knownRuns + day.knownRuns,
       unknownRuns: sum.unknownRuns + day.unknownRuns,
     }),
     { ...emptyTokens(), knownRuns: 0, unknownRuns: 0 },
   );
-  return { daily, totals, start, end, invalidDateRuns };
+  return { daily, totals, cache, start, end, invalidDateRuns };
 }
 
 export function usageLevel(tokens: number, maximum: number): 0 | 1 | 2 | 3 | 4 {

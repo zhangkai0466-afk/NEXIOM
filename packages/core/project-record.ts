@@ -36,6 +36,7 @@ const agentItemStatuses = new Set(["running", "completed", "interrupted"]);
 const conversationStages = new Set(["model", "validation", "chart", "paper"]);
 const agentItemTypes = new Set([
   "agent_message",
+  "agent_activity",
   "reasoning",
   "command_execution",
   "file_change",

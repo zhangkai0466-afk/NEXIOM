@@ -1,0 +1,195 @@
+.nexiom-task-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  vertical-align: middle;
+}
+
+.nexiom-task-status.nexiom-task-status-compact {
+  gap: 9px;
+}
+
+.nexiom-task-icon.nexiom-task-icon {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 var(--nexiom-task-icon-size, 32px);
+  width: var(--nexiom-task-icon-size, 32px);
+  height: var(--nexiom-task-icon-size, 32px);
+  min-width: var(--nexiom-task-icon-size, 32px);
+  overflow: visible;
+  vertical-align: middle;
+  pointer-events: none;
+}
+
+.nexiom-task-icon-pixels,
+.nexiom-task-icon-result {
+  display: grid;
+  place-items: center;
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+  transform-origin: center;
+  transition: opacity 360ms ease, transform 360ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.nexiom-task-icon-pixels {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.nexiom-task-icon-result {
+  color: #20ad65;
+  opacity: 0;
+  transform: scale(0.75);
+}
+
+.nexiom-task-icon:not([data-task-status="running"]) .nexiom-task-icon-pixels {
+  opacity: 0;
+  transform: scale(0.72);
+}
+
+.nexiom-task-icon:not([data-task-status="running"]) .nexiom-task-icon-result {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.nexiom-task-icon[data-task-status="failed"] .nexiom-task-icon-result,
+.nexiom-task-label.nexiom-task-label[data-task-status="failed"] {
+  color: var(--danger, #d94949);
+}
+
+.nexiom-task-icon:is([data-task-status="cancelled"], [data-task-status="interrupted"]) .nexiom-task-icon-result,
+.nexiom-task-label.nexiom-task-label:is([data-task-status="cancelled"], [data-task-status="interrupted"]) {
+  color: var(--muted, #7c838c);
+}
+
+.nexiom-task-final-check {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  color: #fff;
+  background: #20ad65;
+}
+
+.nexiom-task-label.nexiom-task-label {
+  position: relative;
+  display: inline-block;
+  min-width: 0;
+  color: var(--muted, #7c838c);
+  line-height: inherit;
+  animation: none;
+}
+
+.nexiom-task-label.nexiom-task-label[data-task-status="completed"] {
+  color: #20ad65;
+}
+
+/* The narrow white band crosses readable base glyphs, then rests before repeating. */
+@supports ((background-clip: text) or (-webkit-background-clip: text)) {
+  .nexiom-task-label[data-task-status="running"][data-label]::after {
+    content: attr(data-label);
+    position: absolute;
+    inset: 0;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    background-image: linear-gradient(
+      90deg,
+      rgb(255 255 255 / 0) 42%,
+      rgb(255 255 255 / 0.4) 47%,
+      rgb(255 255 255 / 0.9) 50%,
+      rgb(255 255 255 / 0.4) 53%,
+      rgb(255 255 255 / 0) 58%
+    );
+    background-size: 300% 100%;
+    background-repeat: no-repeat;
+    background-position: 100% 50%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    animation: nexiom-task-text-shine 1.64s linear infinite;
+    pointer-events: none;
+    user-select: none;
+  }
+}
+
+@keyframes nexiom-task-text-shine {
+  0% { background-position: 100% 50%; opacity: 0; }
+  5% { opacity: 1; }
+  63% { opacity: 1; }
+  68.293%, 100% { background-position: 0% 50%; opacity: 0; }
+}
+
+.thinking-pixel-trail[data-paused="true"] > span::before,
+.thinking-pixel-trail[data-paused="true"] > span::after,
+.nexiom-task-label.nexiom-task-label[data-task-status][data-paused="true"]::after {
+  animation-play-state: paused;
+}
+
+.tool-summary > .nexiom-task-status {
+  flex: 0 0 auto;
+  overflow: visible;
+  font-size: 0.8125rem;
+}
+
+.nexiom-task-streaming {
+  margin-top: 10px;
+  font-size: 0.875rem;
+}
+
+.modeling-project > .nexiom-task-sidebar-activity,
+.modeling-thread > .nexiom-task-sidebar-activity {
+  display: inline-flex;
+  flex: 0 0 12px;
+  width: 12px;
+  height: 12px;
+  overflow: visible;
+  margin-left: auto;
+}
+
+.agent-plan .nexiom-task-plan-status {
+  margin-left: auto;
+  font-size: 0.8125rem;
+}
+
+.nexiom-task-palette {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(125px, 1fr));
+  gap: 22px 20px;
+  width: 100%;
+  padding: 6px 2px;
+}
+
+:root[data-reduce-motion="true"] .thinking-pixel-trail > span::before,
+:root[data-reduce-motion="true"] .thinking-pixel-trail > span::after,
+:root[data-reduce-motion="true"] .nexiom-task-label::after {
+  animation: none;
+}
+
+:root[data-reduce-motion="true"] .nexiom-task-label::after {
+  display: none;
+}
+
+:root[data-reduce-motion="true"] .nexiom-task-icon-pixels,
+:root[data-reduce-motion="true"] .nexiom-task-icon-result {
+  transition: none;
+}
+
+@media (prefers-reduced-motion: reduce), (forced-colors: active) {
+  .thinking-pixel-trail.thinking-pixel-trail > span::before,
+  .thinking-pixel-trail.thinking-pixel-trail > span::after,
+  .nexiom-task-label[data-task-status="running"][data-label]::after {
+    animation: none;
+  }
+
+  .nexiom-task-label[data-task-status="running"][data-label]::after {
+    display: none;
+  }
+
+  .nexiom-task-icon-pixels,
+  .nexiom-task-icon-result {
+    transition: none;
+  }
+}

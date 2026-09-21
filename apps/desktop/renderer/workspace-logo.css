@@ -1,0 +1,36 @@
+.workspace-logo {
+  --dimension-overview: #FC757B;
+  --dimension-reading: #F97F5F;
+  --dimension-attachments: #FAA26F;
+  --dimension-model: #FDCD94;
+  --dimension-validation: #FEE199;
+  --dimension-chart: #B0D6A9;
+  --dimension-paper: #65BDBA;
+  --dimension-delivery: #3C9BC9;
+  width: 44px;
+  height: 44px;
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  border-radius: 10px;
+}
+.workspace-logo[data-dimension="overview"] { --workspace-logo-color: var(--dimension-overview); }
+.workspace-logo[data-dimension="reading"] { --workspace-logo-color: var(--dimension-reading); }
+.workspace-logo[data-dimension="attachments"] { --workspace-logo-color: var(--dimension-attachments); }
+.workspace-logo[data-dimension="model"] { --workspace-logo-color: var(--dimension-model); }
+.workspace-logo[data-dimension="validation"] { --workspace-logo-color: var(--dimension-validation); }
+.workspace-logo[data-dimension="chart"] { --workspace-logo-color: var(--dimension-chart); }
+.workspace-logo[data-dimension="paper"] { --workspace-logo-color: var(--dimension-paper); }
+.workspace-logo[data-dimension="delivery"] { --workspace-logo-color: var(--dimension-delivery); }
+.workspace-logo[data-dimension] {
+  color: var(--workspace-logo-color);
+  background: color-mix(in srgb, var(--workspace-logo-color) 12%, var(--panel));
+}
+.workspace-logo .modeling-hierarchy-icon { fill: currentColor; stroke: none; }
+.workspace-logo-compact { width: 28px; height: 28px; border-radius: 7px; }
+.workspace-logo-compact > svg { width: 18px; height: 18px; }
+.thread-empty > .workspace-logo { margin-bottom: 22px; }
+.reading-report-title { min-width: 0; display: flex; align-items: center; gap: 12px; }
+@media (forced-colors: active) {
+  .workspace-logo[data-dimension] { color: CanvasText; background: Canvas; }
+}

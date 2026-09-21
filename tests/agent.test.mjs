@@ -165,6 +165,7 @@ test("portable Agent contexts drop native thread ids but retain token and compac
       lastInputTokens: 2000,
       lastOutputTokens: 300,
       cachedInputTokens: 1000,
+      cacheWriteInputTokens: 250,
     };
     yield { type: "context.compacted", itemId: "native-compaction" };
     yield { type: "turn.completed", usage: null };
@@ -187,6 +188,7 @@ test("portable Agent contexts drop native thread ids but retain token and compac
   assert.equal(portableContext.totalTokens, 8000);
   assert.equal(portableContext.lastInputTokens, 2000);
   assert.equal(portableContext.cachedInputTokens, 1000);
+  assert.equal(portableContext.cacheWriteInputTokens, 250);
   assert.equal(portableContext.compactions, 1);
 
   await core.close();
@@ -201,6 +203,7 @@ test("portable Agent contexts drop native thread ids but retain token and compac
     assert.equal(restoredContext.lastInputTokens, 2000);
     assert.equal(restoredContext.lastOutputTokens, 300);
     assert.equal(restoredContext.cachedInputTokens, 1000);
+    assert.equal(restoredContext.cacheWriteInputTokens, 250);
     assert.equal(restoredContext.compactions, 1);
   } finally {
     await restoredCore.close();
@@ -226,7 +229,7 @@ test("fresh NEXIOM requires its own model and key even when global credentials e
   assert.equal(snapshot.providers[0].model, "");
   assert.equal(snapshot.providers[0].hasApiKey, false);
   assert.equal(snapshot.runtime.connected, false);
-  assert.match(snapshot.runtime.label, /模型名称/);
+  assert.match(snapshot.runtime.label, /模型 ID/);
   assert.equal(runtime.probes.length, 0);
   const { thread } = await core.request({ type: "project.create", name: "Private workspace" });
   assert.ok(path.resolve(core.snapshot().snapshot.projects[0].root).startsWith(path.resolve(dir) + path.sep));
@@ -739,6 +742,10 @@ test("switching A to B and back resumes each provider's own engine thread", asyn
     assert.equal(config.provider.id, expected.id);
     assert.equal(config.provider.model, expected.model);
     assert.equal(config.provider.revision, expected.revision);
+    assert.equal(
+      config.cacheThreadState,
+      index === 2 ? "continuation" : "new_thread",
+    );
     assert.ok(!run.runtimeConfig.includes(index === 1 ? "key-b" : "key-a"));
   }
 
@@ -782,6 +789,16 @@ test("the configured model ID controls requests while its display name stays ind
   assert.equal(config.resolvedModelProvider, "nexiom");
   assert.equal(core.snapshot().snapshot.runtime.activeModel, "fixture-model");
   assert.equal(core.snapshot().snapshot.providers[0].modelName, "Fixture Display Name");
+  const savedProvider = core.snapshot().snapshot.providers[0];
+  await core.request({
+    type: "provider.upsert",
+    provider: { ...savedProvider, modelName: "Renamed Display Name" },
+  });
+  assert.equal(core.snapshot().snapshot.runtime.connected, true);
+  await settled(core, (await core.request(requestFor(thread))).runId);
+  assert.equal(runtime.calls[1].provider.model, "fixture-model");
+  assert.equal(runtime.calls[1].provider.modelName, "Renamed Display Name");
+  assert.equal(runtime.calls[1].threadId, "engine-thread-1");
 });
 
 test("editing an independent provider isolates its previous engine session", async (t) => {

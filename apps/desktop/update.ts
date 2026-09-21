@@ -8,6 +8,7 @@ export interface DesktopUpdateTarget {
 const releaseDirectoryPattern = /^NEXIOM-([0-9A-Za-z.+-]+)-win-x64$/i;
 export const currentReleaseDirectoryName = "NEXIOM-current-win-x64";
 const previousReleaseDirectoryPattern = /^\.nexiom-previous-[0-9a-f-]+$/i;
+const stagedReleaseDirectoryPattern = /^\.nexiom-update-[0-9a-f-]+$/i;
 const normalized = (value: string) => path.normalize(value).toLowerCase();
 export const releaseVersionFromDirectoryName = (name: string): string | null =>
   releaseDirectoryPattern.exec(name)?.[1] ?? null;
@@ -34,11 +35,27 @@ export function obsoleteReleaseDirectoryNames(
     return names.filter(
       (name) =>
         numericVersion(releaseVersionFromDirectoryName(name) ?? "") !== null ||
-        previousReleaseDirectoryPattern.test(name),
+        previousReleaseDirectoryPattern.test(name) ||
+        stagedReleaseDirectoryPattern.test(name),
+    );
+  if (stagedReleaseDirectoryPattern.test(currentDirectoryName))
+    return names.filter(
+      (name) =>
+        name.toLowerCase() !== currentDirectoryName.toLowerCase() &&
+        (numericVersion(releaseVersionFromDirectoryName(name) ?? "") !== null ||
+          name.toLowerCase() === currentReleaseDirectoryName.toLowerCase() ||
+          previousReleaseDirectoryPattern.test(name) ||
+          stagedReleaseDirectoryPattern.test(name)),
     );
   const currentVersion = releaseVersionFromDirectoryName(currentDirectoryName);
   if (!currentVersion) return [];
   return names.filter((name) => {
+    if (
+      name.toLowerCase() === currentReleaseDirectoryName.toLowerCase() ||
+      previousReleaseDirectoryPattern.test(name) ||
+      stagedReleaseDirectoryPattern.test(name)
+    )
+      return true;
     const version = releaseVersionFromDirectoryName(name);
     if (!version) return false;
     const comparison = compareVersions(version, currentVersion);

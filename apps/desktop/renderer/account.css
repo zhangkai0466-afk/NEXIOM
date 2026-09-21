@@ -192,6 +192,44 @@
   line-height: 1.5;
 }
 
+.account-cache-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: min(100%, 620px);
+  margin: 0 0 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+}
+
+.account-cache-summary > div {
+  min-width: 0;
+  padding: 12px 14px;
+  text-align: center;
+}
+
+.account-cache-summary > div + div {
+  border-left: 1px solid var(--line);
+}
+
+.account-cache-summary dd,
+.account-cache-summary dt {
+  margin: 0;
+}
+
+.account-cache-summary dd {
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 550;
+  font-variant-numeric: tabular-nums;
+}
+
+.account-cache-summary dt {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
 .account-activity-tabs {
   display: flex;
   align-items: center;
@@ -428,6 +466,11 @@
   background: var(--surface);
 }
 
+.account-nickname input:focus-visible {
+  outline: none;
+  border-color: var(--link);
+}
+
 .account-nickname small {
   color: var(--faint);
   font-size: 0.8125rem;
@@ -611,6 +654,18 @@
 
   .account-activity {
     margin-top: 42px;
+  }
+
+  .account-cache-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .account-cache-summary > div:nth-child(3) {
+    border-left: 0;
+  }
+
+  .account-cache-summary > div:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
   }
 
   .account-heatmap-footer {

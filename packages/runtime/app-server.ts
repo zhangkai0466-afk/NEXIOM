@@ -4,6 +4,8 @@ import {
   type ChildProcessWithoutNullStreams,
 } from "node:child_process";
 import { createInterface } from "node:readline";
+import { performance } from "node:perf_hooks";
+import { setImmediate as yieldToEventLoop } from "node:timers/promises";
 import path from "node:path";
 import type { AgentInput, ThreadEvent, ThreadItem } from "./index";
 import type { Usage } from "../../vendor/codex-sdk/src/index";
@@ -34,6 +36,8 @@ const usageDifference = (total: Usage, baseline: Usage): Usage | null => {
 };
 
 type Notification = { method: string; params: RecordValue };
+const NOTIFICATION_BATCH_SIZE = 64;
+const NOTIFICATION_BATCH_MS = 8;
 
 // One owned app-server per active turn; Codex persists and resumes its own threads.
 class AppServerConnection {
@@ -208,7 +212,19 @@ class AppServerConnection {
   }
   async *notifications(): AsyncIterable<Notification> {
     while (true) {
-      while (this.queue.length) yield this.queue.shift()!;
+      let count = 0;
+      let sliceStarted = performance.now();
+      while (this.queue.length) {
+        yield this.queue.shift()!;
+        // Async generators alone only yield to microtasks. Even notifications
+        // filtered by the adapter must give IPC, cancellation and timers time
+        // to run while a native stream is already buffered.
+        if (++count >= NOTIFICATION_BATCH_SIZE || performance.now() - sliceStarted >= NOTIFICATION_BATCH_MS) {
+          await yieldToEventLoop();
+          count = 0;
+          sliceStarted = performance.now();
+        }
+      }
       if (this.failure) throw this.failure;
       await new Promise<void>((resolve) => {
         this.wake = resolve;
@@ -294,7 +310,7 @@ function mapItem(raw: RecordValue): ThreadItem | undefined {
         server: string(raw.server),
         tool: string(raw.tool),
         arguments: raw.arguments,
-        status,
+        status: object(raw.result).isError === true ? "failed" : status,
         ...(raw.error
           ? { error: { message: string(object(raw.error).message) } }
           : {}),
@@ -335,7 +351,7 @@ function mapItem(raw: RecordValue): ThreadItem | undefined {
   }
 }
 
-// Reasoning is an engine detail and is never emitted into the NEXIOM transcript.
+// Reasoning content stays inside the engine. Reading may retain only its lifecycle.
 export class AppServerEvents {
   private items = new Map<string, ThreadItem>();
   private compacted = new Set<string>();
@@ -347,6 +363,7 @@ export class AppServerEvents {
   constructor(
     private turnId = "",
     freshThread = true,
+    private readingActivity = false,
   ) {
     this.baseline = freshThread ? readUsage({}) : null;
   }
@@ -372,7 +389,13 @@ export class AppServerEvents {
     }
     if (method === "item/started" || method === "item/completed") {
       const raw = object(params.item);
-      if (raw.type === "reasoning") return [];
+      if (raw.type === "reasoning") {
+        if (!this.readingActivity || !string(raw.id)) return [];
+        return [{
+          type: method === "item/started" ? "item.started" : "item.completed",
+          item: { id: `activity:${string(raw.id)}`, type: "agent_activity", phase: "thinking" },
+        }];
+      }
       if (raw.type === "contextCompaction") {
         const id = string(raw.id);
         if (method !== "item/completed" || this.compacted.has(id)) return [];
@@ -444,6 +467,7 @@ export class AppServerEvents {
           lastInputTokens: number(last.inputTokens),
           lastOutputTokens: number(last.outputTokens),
           cachedInputTokens: number(last.cachedInputTokens),
+          cacheWriteInputTokens: number(last.cacheWriteInputTokens),
         },
       ];
     }
@@ -488,7 +512,7 @@ export async function* runAppServer(options: {
   executable: string;
   env: NodeJS.ProcessEnv;
   input: AgentInput;
-  developerInstructions: string;
+  developerInstructions?: string;
   baseInstructions: string;
   runtimeHome: string;
   config: Record<string, unknown>;
@@ -528,8 +552,10 @@ export async function* runAppServer(options: {
       approvalPolicy: "never",
       sandbox: input.mode === "plan" ? "read-only" : "workspace-write",
       config: options.config,
-      developerInstructions: options.developerInstructions,
       baseInstructions: options.baseInstructions,
+      ...(options.developerInstructions
+        ? { developerInstructions: options.developerInstructions }
+        : {}),
       ...(!input.threadId && options.nativeTools ? { dynamicTools: options.nativeTools.specs } : {}),
       ...(input.provider.model ? { model: input.provider.model } : {}),
     };
@@ -576,7 +602,7 @@ export async function* runAppServer(options: {
     if (!turnId) throw new Error("Codex 未返回任务标识。");
     activeTurnId = turnId;
     yield { type: "turn.started" };
-    const adapter = new AppServerEvents(turnId, !input.threadId);
+    const adapter = new AppServerEvents(turnId, !input.threadId, input.stageId === "reading");
     for await (const event of connection.notifications()) {
       input.signal.throwIfAborted();
       if (event.params.threadId && event.params.threadId !== threadId) continue;

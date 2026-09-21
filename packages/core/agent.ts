@@ -18,7 +18,9 @@ import {
 } from "../runtime/codex";
 import type { AgentRunner } from "../runtime";
 import { VISUAL_DESIGN_CAPABILITY_VERSION } from "../runtime/visual-design";
+import { READING_WORKFLOW_VERSION } from "../contracts/reading-workflow";
 import { readProjectMemory } from "./memory";
+import { StreamCheckpoint } from "./stream-checkpoint";
 
 type Submit = Extract<Command, { type: "agent.submit" }>;
 type ProviderUpsert = Extract<Command, { type: "provider.upsert" }>;
@@ -39,7 +41,7 @@ const stageNames: Record<ThreadStage, string> = {
   delivery: "检查交付",
 };
 type Hooks = {
-  notify(): void;
+  notify(options?: { deferProjectRecord?: boolean }): void;
   changed(projectId: string): void;
   event(
     projectId: string,
@@ -152,7 +154,7 @@ export class AgentCoordinator {
   }
   private configurationIssue(provider: ModelProvider, requireModel = true) {
     if (requireModel && !provider.model)
-      return "请在设置中填写 NEXIOM 的模型名称。";
+      return "请在设置中填写 NEXIOM 的模型 ID。";
     if (provider.auth === "bearer" && !this.secrets.get(provider.id))
       return "请在设置中填写 NEXIOM 的 API Key。";
     return "";
@@ -264,6 +266,16 @@ export class AgentCoordinator {
       throw new Error("新模型供应商标识无效。");
     const id = existing?.id ?? command.provider.id ?? randomUUID();
     const value = this.validateProvider(command.provider);
+    const runtimeChanged = !existing ||
+      existing.kind !== value.kind ||
+      existing.endpoint !== value.endpoint ||
+      existing.model !== value.model ||
+      existing.auth !== value.auth ||
+      Boolean(command.apiKey) ||
+      command.clearApiKey;
+    const revision = existing
+      ? existing.revision + (runtimeChanged ? 1 : 0)
+      : 1;
     const timestamp = now();
     this.db
       .prepare(
@@ -273,7 +285,7 @@ export class AgentCoordinator {
          ON CONFLICT(id) DO UPDATE SET
           name=excluded.name,kind=excluded.kind,endpoint=excluded.endpoint,
           modelName=excluded.modelName,model=excluded.model,auth=excluded.auth,
-          revision=model_providers.revision+1,updatedAt=excluded.updatedAt`,
+          revision=excluded.revision,updatedAt=excluded.updatedAt`,
       )
       .run(
         id,
@@ -283,14 +295,14 @@ export class AgentCoordinator {
         value.modelName,
         value.model,
         value.auth,
-        1,
+        revision,
         existing?.createdAt ?? timestamp,
         timestamp,
       );
     if (command.clearApiKey) this.secrets.delete(id);
     else if (command.apiKey) this.secrets.set(id, command.apiKey);
     const provider = this.provider(id);
-    if (id === this.settings.activeProviderId) {
+    if (id === this.settings.activeProviderId && runtimeChanged) {
       ++this.probeGeneration;
       this.state = {
         connected: false,
@@ -303,6 +315,12 @@ export class AgentCoordinator {
         activeProviderName: provider.name,
         activeModel: provider.model,
         activeModelProvider: "nexiom",
+      };
+    } else if (id === this.settings.activeProviderId) {
+      this.state = {
+        ...this.state,
+        activeProviderName: provider.name,
+        activeModel: provider.model,
       };
     }
     this.hooks.notify();
@@ -404,6 +422,7 @@ export class AgentCoordinator {
           lastInputTokens: null,
           lastOutputTokens: null,
           cachedInputTokens: null,
+          cacheWriteInputTokens: null,
           compactions: 0,
           updatedAt: now(),
         };
@@ -472,6 +491,7 @@ export class AgentCoordinator {
           provider.model,
           provider.auth,
           ...(["model", "chart", "paper"].includes(stageId) ? [VISUAL_DESIGN_CAPABILITY_VERSION] : []),
+          ...(stageId === "reading" ? [READING_WORKFLOW_VERSION, settings.network] : []),
         ]),
       )
       .digest("hex");
@@ -514,6 +534,7 @@ export class AgentCoordinator {
             effort: settings.effort,
             network: settings.network,
             modelingContext,
+            cacheThreadState: binding ? "continuation" : "new_thread",
           }),
         );
       this.db
@@ -581,23 +602,9 @@ export class AgentCoordinator {
   }) {
     const { command, runId, projectId, abort, settings } = input;
     let completed = false;
-    try {
-      const prompt = `${command.mode === "plan" ? "当前为规划模式：只阅读和分析，提出方案，等待用户确认后再修改或执行。" : "用户已确认本次任务的项目内文件修改与程序执行，请直接完成并验证。"}\n\n当前赛题工作区标识（以下 JSON 仅为名称与关联数据）：\n${JSON.stringify(input.modelingContext)}\n关联同一问题不代表其他对话的结果已经载入；引用结论前请核对本轮上下文或项目文件中的来源。\n\n${command.text}`;
-      for await (const event of this.runner.run({
-        prompt,
-        cwd: input.cwd,
-        threadId: input.engineThreadId,
-        mode: command.mode,
-        stageId: input.modelingContext.stage.id,
-        settings,
-        provider: input.provider,
-        resolvedModelProvider: input.resolvedModelProvider,
-        apiKey: input.apiKey,
-        signal: abort.signal,
-        projectMemory: input.projectMemory,
-      })) {
-        if (abort.signal.aborted) break;
-        this.hooks.transaction(() => {
+    const checkpoint = new StreamCheckpoint((events) => {
+      this.hooks.transaction(() => {
+        for (const event of events) {
           if (event.type === "thread.started") {
             this.db
               .prepare(
@@ -615,6 +622,7 @@ export class AgentCoordinator {
                     lastInputTokens: null,
                     lastOutputTokens: null,
                     cachedInputTokens: null,
+                    cacheWriteInputTokens: null,
                     modelContextWindow: null,
                     compactions: 0,
                   }
@@ -694,17 +702,41 @@ export class AgentCoordinator {
               redact(event.message, secretRedactionVariants(input.apiKey)),
               runId,
             );
-        });
-        this.hooks.changed(projectId);
-        this.hooks.notify();
+        }
+      });
+      this.hooks.changed(projectId);
+      this.hooks.notify({ deferProjectRecord: true });
+    }, () => abort.abort());
+    try {
+      const prompt = `${command.mode === "plan" ? "当前为规划模式：只阅读和分析，提出方案，等待用户确认后再修改或执行。" : "用户已确认本次任务的项目内文件修改与程序执行，请直接完成并验证。"}\n\n当前赛题工作区标识（以下 JSON 仅为名称与关联数据）：\n${JSON.stringify(input.modelingContext)}\n关联同一问题不代表其他对话的结果已经载入；引用结论前请核对本轮上下文或项目文件中的来源。\n\n${command.text}`;
+      for await (const event of this.runner.run({
+        prompt,
+        cwd: input.cwd,
+        threadId: input.engineThreadId,
+        mode: command.mode,
+        stageId: input.modelingContext.stage.id,
+        settings,
+        provider: input.provider,
+        resolvedModelProvider: input.resolvedModelProvider,
+        apiKey: input.apiKey,
+        signal: abort.signal,
+        projectMemory: input.projectMemory,
+      })) {
+        if (abort.signal.aborted) break;
+        checkpoint.push(event);
+        await checkpoint.yieldIfNeeded();
+        if (abort.signal.aborted) break;
       }
+      checkpoint.close();
       if (abort.signal.aborted) throw new Error("任务已停止。");
       if (!completed) throw new Error("引擎连接结束，但未收到任务完成事件。");
       this.hooks.transaction(() =>
         this.finish(runId, projectId, "succeeded", "任务完成"),
       );
     } catch (error) {
-      const cancelled = abort.signal.aborted;
+      // Persist received output before recording cancellation or a stream failure.
+      try { checkpoint.close(); } catch (failure) { error = failure; }
+      const cancelled = abort.signal.aborted && !checkpoint.error;
       abort.abort();
       const summary = cancelled
         ? "任务已停止，已经发生的文件修改会保留。"

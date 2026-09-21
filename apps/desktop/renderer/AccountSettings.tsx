@@ -16,17 +16,19 @@ import {
 } from "lucide-react";
 import type { AccountProfile, Run } from "../../../packages/contracts";
 import { request } from "./bridge";
-import { aggregateTokenUsage, localDateKey, usageLevel, type UsageDay } from "./token-usage";
+import { aggregateTokenUsage, localDateKey, tokenRate, usageLevel, type UsageDay } from "./token-usage";
 import "./account.css";
 
-const count = new Intl.NumberFormat("zh-CN");
 const compactCount = new Intl.NumberFormat("zh-CN", {
   notation: "compact",
   maximumFractionDigits: 1,
 });
 const CROP_VIEWPORT = 320;
+const CROP_PAN_MARGIN = 24;
 const sameProfile = (a: AccountProfile, b: AccountProfile) =>
   a.nickname === b.nickname && a.avatar === b.avatar;
+const percent = (value: number | null) =>
+  value == null ? "尚无数据" : `${(value * 100).toFixed(1)}%`;
 
 interface CropAsset {
   file: File;
@@ -38,10 +40,10 @@ interface CropAsset {
 type ActivityMode = "daily" | "weekly" | "cumulative";
 
 function dayLabel(day: UsageDay) {
-  const date = day.date.replaceAll("-", "/");
-  if (!day.knownRuns && !day.unknownRuns) return `${date} · 暂无用量记录`;
-  if (!day.knownRuns) return `${date} · ${day.unknownRuns} 次未报告用量`;
-  return `${date} · ${count.format(day.totalTokens)} tokens${day.unknownRuns ? ` · ${day.unknownRuns} 次未报告` : ""}`;
+  const [, month, date] = day.date.split("-").map(Number);
+  const prefix = `${month}月${date}日`;
+  if (!day.knownRuns && day.unknownRuns) return `${prefix} 有 ${day.unknownRuns} 次任务未报告 Token 用量`;
+  return `${prefix} 使用了 ${compactCount.format(day.totalTokens)} 个 Token${day.unknownRuns ? `，另有 ${day.unknownRuns} 次任务未报告用量` : ""}`;
 }
 
 function formatDuration(milliseconds: number) {
@@ -156,6 +158,14 @@ export function AccountSettings({
     return Math.max(maximum, finished - started);
   }, 0), [runs]);
   const peakTokens = Math.max(0, ...usage.daily.map((day) => day.totalTokens));
+  const overallCacheRate = tokenRate(
+    usage.totals.cachedInputTokens,
+    usage.totals.inputTokens,
+  );
+  const continuationCacheRate = tokenRate(
+    usage.cache.continuationCachedInputTokens,
+    usage.cache.continuationInputTokens,
+  );
   const activityValues = useMemo(() => {
     if (activityMode === "daily") return usage.daily.map((day) => day.totalTokens);
     if (activityMode === "cumulative") {
@@ -171,7 +181,10 @@ export function AccountSettings({
   }, [activityMode, leading, usage.daily]);
   const activityMaximum = Math.max(0, ...activityValues);
   const cropBaseScale = cropAsset
-    ? Math.max(CROP_VIEWPORT / cropAsset.width, CROP_VIEWPORT / cropAsset.height)
+    ? Math.max(
+        (CROP_VIEWPORT + CROP_PAN_MARGIN * 2) / cropAsset.width,
+        (CROP_VIEWPORT + CROP_PAN_MARGIN * 2) / cropAsset.height,
+      )
     : 1;
 
   useEffect(() => {
@@ -314,8 +327,9 @@ export function AccountSettings({
 
   function activityLabel(day: UsageDay, dayIndex: number) {
     if (activityMode === "daily") return dayLabel(day);
-    const label = activityMode === "weekly" ? "所在周" : "截至当日累计";
-    return `${day.date.replaceAll("-", "/")} · ${label} ${count.format(activityValues[dayIndex] ?? 0)} tokens`;
+    const [, month, date] = day.date.split("-").map(Number);
+    const label = activityMode === "weekly" ? "所在周使用了" : "累计使用了";
+    return `${month}月${date}日 ${label} ${compactCount.format(activityValues[dayIndex] ?? 0)} 个 Token`;
   }
 
   function startCropDrag(event: PointerEvent<HTMLDivElement>) {
@@ -404,6 +418,24 @@ export function AccountSettings({
             ))}
           </div>
         </div>
+        <dl className="account-cache-summary" aria-label="提示词缓存概览">
+          <div>
+            <dd>{percent(overallCacheRate)}</dd>
+            <dt>总体缓存率</dt>
+          </div>
+          <div>
+            <dd>{percent(continuationCacheRate)}</dd>
+            <dt>续聊缓存率</dt>
+          </div>
+          <div>
+            <dd>{compactCount.format(usage.totals.cachedInputTokens)}</dd>
+            <dt>缓存读取 Token</dt>
+          </div>
+          <div>
+            <dd>{compactCount.format(usage.totals.cacheWriteInputTokens)}</dd>
+            <dt>缓存写入 Token</dt>
+          </div>
+        </dl>
         <div className="account-heatmap-scroll">
           <div className="account-heatmap" style={{ "--usage-columns": columns } as React.CSSProperties}>
             <div className="account-heatmap-grid" ref={gridRef} role="group" aria-label="每日 token 用量，方向键切换日期">

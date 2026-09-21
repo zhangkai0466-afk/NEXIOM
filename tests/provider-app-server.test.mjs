@@ -72,6 +72,7 @@ enabled = true
   const requests = [];
   let exerciseTool = false;
   let toolSent = false;
+  let readingCalls = -1;
   const server = http.createServer(async (request, response) => {
     if (request.method !== "POST" || request.url !== "/v1/responses") {
       response.writeHead(404).end();
@@ -84,6 +85,15 @@ enabled = true
       body: Buffer.concat(chunks).toString("utf8"),
     });
     response.writeHead(200, { "Content-Type": "text/event-stream" });
+    if (readingCalls >= 0 && readingCalls < 2) {
+      const status = readingCalls++ === 0 ? "running" : "completed";
+      response.end(sse(
+        { type: "response.created", response: { id: `reading-${status}` } },
+        { type: "response.output_item.done", item: { type: "function_call", id: `stage-${status}`, call_id: `stage-${status}`, namespace: "nexiom_reading", name: "set_reading_stage", arguments: JSON.stringify({ stepId: "read-1", phase: "reading", status }) } },
+        { type: "response.completed", response: { id: `reading-${status}`, usage: { input_tokens: 1, output_tokens: 1, total_tokens: 2 } } },
+      ));
+      return;
+    }
     if (exerciseTool && !toolSent) {
       toolSent = true;
       const body = JSON.parse(requests.at(-1).body);
@@ -205,6 +215,11 @@ enabled = true
     resumedEvents.push(event);
   assert.ok(resumedEvents.some(event => event.type === "turn.completed"));
   assert.equal(resumedEvents.find(event => event.type === "thread.started")?.thread_id, threadId);
+  const firstPayload = JSON.parse(requests[0].body);
+  const resumedPayload = JSON.parse(requests[1].body);
+  assert.equal(firstPayload.instructions, resumedPayload.instructions);
+  assert.equal((firstPayload.instructions.match(/你是 NEXIOM/g) ?? []).length, 1);
+  assert.deepEqual(firstPayload.tools, resumedPayload.tools);
 
   const anonymousEvents = [];
   for await (const event of runner.run({
@@ -240,4 +255,23 @@ enabled = true
   assert.ok((await readdir(runtimeHome)).some(name => name.startsWith("state_")));
   const sessionFiles = await readdir(path.join(runtimeHome, "sessions"), { recursive: true });
   assert.ok(sessionFiles.some(name => name.endsWith(".jsonl") && name.includes(threadId)));
+
+  // Reading can research without granting project write access or importing host tools.
+  readingCalls = 0;
+  const readingEvents = [];
+  for await (const event of runner.run({ ...input, stageId: "reading", settings: { ...input.settings, network: true } }))
+    readingEvents.push(event);
+  assert.ok(readingEvents.some(event => event.type === "turn.completed"));
+  const stageCalls = readingEvents.filter(event => event.type === "item.completed" && event.item.type === "native_tool_call");
+  assert.equal(stageCalls.length, 2, JSON.stringify(readingEvents));
+  assert.ok(stageCalls.every(event => event.item.status === "completed" && event.item.result.accepted === true));
+  assert.deepEqual(stageCalls.map(event => event.item.arguments.status), ["running", "completed"]);
+  const readingPayload = JSON.parse(requests.at(-1).body);
+  assert.ok(readingPayload.tools.some(tool => tool.type === "web_search" || tool.type === "web_search_preview"), JSON.stringify(readingPayload.tools));
+  assert.match(JSON.stringify(readingPayload.tools), /set_reading_stage/);
+  assert.match(JSON.stringify(readingPayload.input), /数据泄漏|信息泄漏/);
+  const offlineEvents = [];
+  for await (const event of runner.run({ ...input, stageId: "reading" })) offlineEvents.push(event);
+  assert.ok(offlineEvents.some(event => event.type === "turn.completed"));
+  assert.ok(!JSON.parse(requests.at(-1).body).tools.some(tool => /^web_search/.test(tool.type)));
 });

@@ -4,6 +4,7 @@ import type { VisualPalette } from "../../../packages/contracts";
 import type { VisualAsset, VisualAssetSummary, VisualElement, VisualFigure, VisualWorkspaceState } from "../../../packages/visualization/document";
 import { renderVisualFigure } from "../../../packages/visualization/render";
 import { request, subscribe } from "./bridge";
+import { WorkspaceLogo } from "./WorkspaceLogo";
 import "./visual-workspace.css";
 
 type Props = { projectId: string; onFilesChanged: () => void };
@@ -225,6 +226,7 @@ export function VisualDesignWorkspace({ projectId, onFilesChanged }: Props) {
 
   return <div className="vws">
     <header className="vws-header">
+      <WorkspaceLogo dimension="chart" />
       <div className="vws-title"><strong>可视化工作台</strong><span>{asset?.title ?? "项目可视化素材"}{dirty && <i title="尚未保存" />}</span></div>
       <div className="vws-modes" role="tablist" aria-label="可视化编辑工具">
         <button role="tab" aria-selected={tool === "color"} className={tool === "color" ? "active" : ""} onClick={() => changeTool("color")}><Palette size={15} />调色</button>

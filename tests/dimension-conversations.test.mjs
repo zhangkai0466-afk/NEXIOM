@@ -9,7 +9,6 @@ import service from "../.build/service.cjs";
 
 const { CoreService } = service;
 const stages = {
-  overview: "项目总览",
   reading: "赛题研读",
   attachments: "附件分析",
   delivery: "检查交付",
@@ -44,10 +43,11 @@ test("project dimension chats are created once, stay separate, and persist with 
     const otherThread = (await core.request({ ...request, projectId: other.id })).thread;
     assert.notEqual(otherThread.id, thread.id);
   }
-  assert.equal(new Set(identities.values()).size, 4);
+  assert.equal(new Set(identities.values()).size, 3);
   const before = core.snapshot().snapshot;
   await assert.rejects(core.request({ type: "thread.ensure", projectId: project.id, stageId: "model" }));
-  await assert.rejects(core.request({ type: "thread.ensure", projectId: randomUUID(), stageId: "overview" }), /项目不存在/);
+  await assert.rejects(core.request({ type: "thread.ensure", projectId: project.id, stageId: "overview" }));
+  await assert.rejects(core.request({ type: "thread.ensure", projectId: randomUUID(), stageId: "reading" }), /项目不存在/);
   await assert.rejects(core.request({ type: "thread.create", projectId: project.id, stageId: "overview" }));
   await assert.rejects(core.request({ type: "thread.rename", threadId: modeling.id, title: "  " }));
   assert.equal(core.snapshot().snapshot.threads.length, before.threads.length);
@@ -64,7 +64,7 @@ test("project dimension chats are created once, stay separate, and persist with 
   }
   const db = new DatabaseSync(path.join(dir, "workspace.sqlite"));
   try {
-    assert.throws(() => db.prepare("INSERT INTO threads (id,projectId,title,createdAt,stageId,questionId) VALUES (?, ?, ?, ?, 'overview', NULL)")
+    assert.throws(() => db.prepare("INSERT INTO threads (id,projectId,title,createdAt,stageId,questionId) VALUES (?, ?, ?, ?, 'reading', NULL)")
       .run(randomUUID(), project.id, "重复", new Date().toISOString()), /UNIQUE constraint/);
     assert.throws(() => db.prepare("UPDATE threads SET questionId=? WHERE id=?").run(modeling.questionId, identities.get("reading")), /CHECK constraint/);
     assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
@@ -192,5 +192,5 @@ test("each project dimension submits its own stage identity and conversation his
     assert.ok(call.prompt.endsWith(`讨论${name}`));
     assert.equal(snapshot.items.find((item) => item.threadId === thread.id && item.item.type === "agent_message").item.text, `${stageId}的回答`);
   }
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, Object.keys(stages).length);
 });

@@ -300,7 +300,7 @@ export function ModelSettings({
       setNotice(
         nextModels.length
           ? `已获取 ${nextModels.length} 个模型。`
-          : "服务没有返回可选模型，请继续手动填写模型名称。",
+          : "服务没有返回可选模型，请继续手动填写模型 ID。",
       );
     });
   }
@@ -394,7 +394,7 @@ export function ModelSettings({
           <div className="settings-row">
             <div className="settings-row-copy">
               <strong>当前模型</strong>
-              <p>{needsSetup ? "填写下方 API 地址、API Key 和模型名称后保存，即可开始对话。" : "新任务将使用此模型；现有会话会按供应商配置恢复。"}</p>
+              <p>{needsSetup ? "填写下方 API 地址、API Key、模型名称和模型 ID 后保存，即可开始对话。" : "新任务将使用此模型；现有会话会按供应商配置恢复。"}</p>
             </div>
             <span className="settings-value provider-active-model">
               {activeModel}

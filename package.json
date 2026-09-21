@@ -1,6 +1,6 @@
 {
   "name": "nexiom",
-  "version": "0.6.20",
+  "version": "0.6.24",
   "private": true,
   "type": "module",
   "main": ".build/desktop.cjs",
@@ -25,6 +25,7 @@
     "katex": "^0.18.7",
     "lucide-react": "^0.468.0",
     "motion": "^13.4.0",
+    "pdfjs-dist": "^6.3.289",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-markdown": "^10.1.0",

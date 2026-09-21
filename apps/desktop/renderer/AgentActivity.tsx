@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react";
-import { ThinkingOrb, type OrbState } from "thinking-orbs";
 import type { AgentItem, Run } from "../../../packages/contracts";
+import { AgentTaskStatus } from "./AgentTaskStatus";
+import { getCurrentAgentTaskKind } from "./agent-task-state";
 
 export function AgentActivity({
   run,
   items,
   paused,
+  casual = false,
 }: {
   run: Run;
   items: AgentItem[];
   paused: boolean;
+  casual?: boolean;
 }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -17,38 +20,30 @@ export function AgentActivity({
       setElapsed(
         Math.max(
           0,
-          Math.floor((Date.now() - Date.parse(run.createdAt)) / 1000),
+          Math.floor(((run.finishedAt ? Date.parse(run.finishedAt) : Date.now()) - Date.parse(run.createdAt)) / 1000),
         ),
       );
     update();
+    if (run.status !== "running") return;
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [run.id, run.createdAt]);
-  const current = items
-    .filter((item) => item.runId === run.id && item.status === "running")
-    .at(-1)?.item;
-  let state: OrbState = "working";
-  let label = "正在分析";
-  if (current?.type === "agent_message") {
-    state = "composing";
-    label = "正在输出";
-  } else if (current?.type === "command_execution") {
-    state = "solving";
-    label = "正在运行";
-  } else if (current?.type === "file_change") {
-    state = "weaving";
-    label = "正在修改文件";
-  } else if (current?.type === "web_search") {
-    state = "searching";
-    label = "正在检索";
-  }
+  }, [run.id, run.createdAt, run.finishedAt, run.status]);
+  const kind = casual ? "thinking" : getCurrentAgentTaskKind(items, run.id, run.mode === "plan" ? "planning" : "thinking");
+  const status = run.status === "succeeded" ? "completed" : run.status;
   return (
     <div className="working-indicator" role="status">
-      <ThinkingOrb state={state} size={20} paused={paused} />
-      <span className="activity-label">{label}</span>
-      <span className="activity-time">
-        {elapsed >= 60 ? `${Math.floor(elapsed / 60)} 分 ` : ""}
-        {elapsed % 60} 秒
+      <AgentTaskStatus
+        kind={kind}
+        status={status}
+        paused={paused}
+        compact
+        final={status === "completed"}
+        label={status === "completed" ? "已完成" : undefined}
+      />
+      <span className="activity-time" role="timer" aria-live="off">
+        {status !== "running" && "· 耗时 "}
+        {!casual && elapsed >= 60 ? `${Math.floor(elapsed / 60)} 分 ` : ""}
+        {casual ? elapsed : elapsed % 60} 秒
       </span>
     </div>
   );

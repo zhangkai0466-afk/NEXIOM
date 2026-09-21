@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { Monitor, Moon, Sun } from "lucide-react";
-import { ThinkingOrb } from "thinking-orbs";
 import type { ThemeSource, ThemeState } from "../../../packages/contracts";
 import { readPreference, writePreference } from "./preferences";
+import { AgentTaskStatus } from "./AgentTaskStatus";
+import { AGENT_TASK_STATES, type AgentTaskKind } from "./agent-task-state";
 
 const TYPOGRAPHY_VERSION = "2";
 const DEFAULT_UI_FONT_SIZE = 14;
@@ -278,14 +279,11 @@ export function AppearanceSettings({
             />
           </label>
           <div className="settings-row motion-preview">
-            <ThinkingOrb
-              state="working"
-              size={20}
-              theme={appearance.theme.resolved}
-              paused={appearance.reduceMotion}
-            />
-            <span>正在分析</span>
-            <span className="muted">动画预览</span>
+            <div className="nexiom-task-palette" aria-label="七种任务状态动画预览">
+              {(Object.keys(AGENT_TASK_STATES) as AgentTaskKind[]).map((kind) => (
+                <AgentTaskStatus key={kind} kind={kind} paused={appearance.reduceMotion} compact />
+              ))}
+            </div>
           </div>
         </div>
         <p className="settings-section-description">

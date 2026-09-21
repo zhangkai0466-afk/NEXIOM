@@ -5,6 +5,10 @@ import { request } from "./bridge";
 
 const tokens = (value: number | null | undefined) =>
   value == null ? "尚无数据" : value.toLocaleString("zh-CN");
+const rate = (cached: number | null | undefined, input: number | null | undefined) =>
+  cached == null || input == null || input <= 0
+    ? "尚无数据"
+    : `${((cached / input) * 100).toFixed(1)}%`;
 export function ContextDetails({ context }: { context?: ThreadContext }) {
   const percent =
     context?.modelContextWindow && context.lastInputTokens != null
@@ -34,6 +38,10 @@ export function ContextDetails({ context }: { context?: ThreadContext }) {
         <dd>{tokens(context?.lastOutputTokens)} tokens</dd>
         <dt>缓存输入</dt>
         <dd>{tokens(context?.cachedInputTokens)} tokens</dd>
+        <dt>缓存写入</dt>
+        <dd>{tokens(context?.cacheWriteInputTokens)} tokens</dd>
+        <dt>上次缓存率</dt>
+        <dd>{rate(context?.cachedInputTokens, context?.lastInputTokens)}</dd>
         <dt>压缩次数</dt>
         <dd>{context?.compactions ?? 0}</dd>
         <dt>会话恢复</dt>

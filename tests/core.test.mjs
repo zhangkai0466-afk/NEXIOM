@@ -116,7 +116,7 @@ test("workspace access rejects a saved root replaced by a link to another direct
   await assert.rejects(readFile(path.join(outside, "inputs", "不得越界.txt"), "utf8"), /ENOENT/);
 });
 
-test("legacy root projects cannot read, import, inspect, or run against the whole disk", async (t) => {
+test("legacy root projects cannot read, import, or run against the whole disk", async (t) => {
   const dir = await mkdtemp(path.join(tmpdir(), "nexiom-legacy-root-"));
   let core = new CoreService(dir);
   t.after(async () => {
@@ -138,7 +138,6 @@ test("legacy root projects cannot read, import, inspect, or run against the whol
     { type: "project.files", projectId },
     { type: "memory.read", projectId },
     { type: "file.import", projectId, name: "unsafe.txt", base64: Buffer.from("x").toString("base64") },
-    { type: "project.inspect", threadId },
     { type: "agent.submit", threadId, text: "执行", mode: "plan", executionConfirmed: false, clientRequestId: randomUUID() },
   ]) await assert.rejects(core.request(command), error => {
     assert.match(error.message, /磁盘或文件系统根目录/);
@@ -213,15 +212,6 @@ test("a competition workspace carries its project history into a fresh NEXIOM da
     text: "保留这条项目研究结论",
     clientRequestId: randomUUID(),
   });
-  const { runId } = await core.request({
-    type: "project.inspect",
-    threadId: opened.thread.id,
-  });
-  for (let i = 0; i < 100; i++) {
-    const run = core.snapshot().snapshot.runs.find((item) => item.id === runId);
-    if (run?.status !== "running") break;
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  }
   await core.close();
 
   const recordPath = path.join(workspace, ".nexiom", "project.json");
@@ -233,8 +223,6 @@ test("a competition workspace carries its project history into a fresh NEXIOM da
   assert.equal(record.project.name, "国赛 C 题 · 完整记录");
   assert.equal("root" in record.project, false);
   assert.ok(record.records.messages.some((item) => item.text === "保留这条项目研究结论"));
-  assert.equal(record.records.runs.find((item) => item.id === runId).status, "succeeded");
-  assert.ok(record.records.events.some((item) => item.type === "tool.completed"));
   assert.equal("settings" in record, false);
   assert.equal("providers" in record, false);
   assert.equal("account" in record, false);
@@ -247,7 +235,6 @@ test("a competition workspace carries its project history into a fresh NEXIOM da
   assert.equal(restored.project.root, await realpath(workspace));
   assert.equal(restored.thread.id, opened.thread.id);
   assert.ok(restored.snapshot.messages.some((item) => item.text === "保留这条项目研究结论"));
-  assert.equal(restored.snapshot.runs.find((item) => item.id === runId).status, "succeeded");
   assert.ok(restored.snapshot.events.some((item) => item.type === "project.restored"));
   const restoredDb = new DatabaseSync(path.join(secondDataDir, "workspace.sqlite"));
   assert.deepEqual(restoredDb.prepare("PRAGMA foreign_key_check").all(), []);
@@ -754,6 +741,20 @@ test("imports do not overwrite files; reads reject traversal and symlink escape"
     path: "inputs/数据.csv",
   });
   assert.equal(result.file.text, "x,y\n1,2\n");
+  const pdfBytes = Buffer.from("%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF");
+  await core.request({
+    type: "file.import",
+    projectId: project.id,
+    name: "赛题.pdf",
+    base64: pdfBytes.toString("base64"),
+  });
+  const pdf = await core.request({
+    type: "file.read",
+    projectId: project.id,
+    path: "inputs/赛题.pdf",
+  });
+  assert.equal(pdf.file.mime, "application/pdf");
+  assert.equal(Buffer.from(pdf.file.base64, "base64").toString(), pdfBytes.toString());
   await assert.rejects(
     core.request({ ...payload, name: "../outside.csv" }),
     /文件名无效/,
@@ -787,49 +788,6 @@ test("imports do not overwrite files; reads reject traversal and symlink escape"
     }),
     /超出项目范围/,
   );
-});
-test("inspection produces real file counts and persisted terminal states", async (t) => {
-  const { core, project, thread } = await setup(t);
-  await core.request({
-    type: "file.import",
-    projectId: project.id,
-    name: "observations.csv",
-    base64: Buffer.from("a,b\n1,2").toString("base64"),
-  });
-  const { runId } = await core.request({
-    type: "project.inspect",
-    threadId: thread.id,
-  });
-  for (
-    let i = 0;
-    i < 100 && core.snapshot().snapshot.runs[0].status === "running";
-    i++
-  )
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  const result = core.snapshot().snapshot;
-  assert.equal(result.runs.find((run) => run.id === runId).status, "succeeded");
-  assert.match(result.messages.at(-1).text, /共 1 个文件/);
-  assert.match(result.messages.at(-1).text, /未解析文档内容/);
-  assert.ok(
-    result.events.some(
-      (event) => event.type === "tool.completed" && event.runId === runId,
-    ),
-  );
-});
-test("cancel stops a pending inspection and records cancellation instead of success", async (t) => {
-  const { core, thread } = await setup(t);
-  const { runId } = await core.request({
-    type: "project.inspect",
-    threadId: thread.id,
-  });
-  await core.request({ type: "run.cancel", runId });
-  for (
-    let i = 0;
-    i < 100 && core.snapshot().snapshot.runs[0].status === "running";
-    i++
-  )
-    await new Promise((resolve) => setTimeout(resolve, 10));
-  assert.equal(core.snapshot().snapshot.runs[0].status, "cancelled");
 });
 test("startup marks an abandoned run interrupted without replaying it", async (t) => {
   const dir = await mkdtemp(path.join(tmpdir(), "nexiom-recovery-"));
