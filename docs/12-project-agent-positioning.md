@@ -24,7 +24,7 @@ flowchart LR
 | 桌面入口与核心分离 | `apps/desktop/main.ts` 用 `utilityProcess.fork` 启动 Core；Renderer 通过 preload 调用验证后的命令 | Core 独立于渲染进程，但生命周期仍由桌面宿主管理；关闭应用会停止任务，不是常驻后台服务 |
 | 真实 Agent 执行 | `packages/runtime/app-server.ts` 启动官方原生 `codex app-server --listen stdio://`，调用 `thread/start`、`thread/resume`、`turn/start` | 模型循环、文件与命令工具、原生上下文维护交给 Codex；NEXIOM 没有另写第二套推理循环 |
 | 项目工作目录 | `packages/core/service.ts` 打开用户选择的真实目录，`packages/core/agent.ts` 取项目 `root` 作为每次执行的 `cwd` | 单项目同时只允许一个活动 Run；工作目录不是实验版本库，也不自动冻结输入文件 |
-| 任务执行边界 | `agent.submit` 要求执行模式携带本次确认，运行时映射为 `read-only` 或 `workspace-write` | 目前是按次确认；还没有版本化计划审批、逐工具审批和任意权限升级的交互 |
+| 任务执行边界 | `agent.submit` 直接启动统一任务，运行时在当前项目映射为 `workspace-write` | 不提供“规划 / 执行”切换或逐次确认；还没有逐工具审批和任意权限升级的交互 |
 | 持久会话与实际执行记录 | SQLite 保存当前应用索引与运行时绑定；`.nexiom/project.json` 同步保存项目、Thread、Message、Run、AgentItem 和上下文等项目记录 | 应用重启可以续接；重新选择工作文件夹可恢复 NEXIOM 历史，但不恢复 Codex 原生 thread ID；尚无独立 Task 实体和任务依赖 |
 | 项目记忆 | `packages/core/memory.ts` 读写 `.nexiom/MEMORY.md`，SHA-256 冲突检查及原子保存；每次提交重新注入 | 用户维护的文本记忆；还没有自动事实抽取、来源索引、过期判断和跨会话检索 |
 | 原生上下文机制 | Runtime 接收真实文本增量、token 统计及压缩通知 | 自动压缩由 Codex 决定；上次 token 用量不等于精确实时上下文占用率；尚无手动压缩入口 |

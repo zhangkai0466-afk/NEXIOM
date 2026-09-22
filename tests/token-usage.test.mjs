@@ -95,8 +95,20 @@ test("date window uses local calendar dates, excludes old/future days, and repor
   ], now, 3);
   assert.deepEqual(report.daily.map((day) => day.date), ["2026-09-17", "2026-09-18", "2026-09-19"]);
   assert.equal(report.totals.totalTokens, 240);
+  assert.equal(report.allTimeTotals.totalTokens, 360);
   assert.equal(report.invalidDateRuns, 1);
   assert.equal(localDateKey(new Date(2026, 0, 2)), "2026-01-02");
+});
+
+test("lifetime usage retains older years but excludes tomorrow midnight", () => {
+  const now = new Date(2026, 8, 22, 12);
+  const report = aggregateTokenUsage([
+    run("old", new Date(2024, 0, 1).toISOString()),
+    run("today", now.toISOString()),
+    run("tomorrow", new Date(2026, 8, 23).toISOString()),
+  ], now);
+  assert.equal(report.totals.totalTokens, 120);
+  assert.equal(report.allTimeTotals.totalTokens, 240);
 });
 
 test("calendar grid keeps every date across daylight-saving transitions and leap day", () => {

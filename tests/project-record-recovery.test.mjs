@@ -67,7 +67,7 @@ async function setup(t) {
   };
   const submit = async fixture => {
     const { runId } = await core.request({ type: "agent.submit", threadId: fixture.thread.id,
-      text: "Fixture", mode: "plan", clientRequestId: randomUUID() });
+      text: "Fixture", clientRequestId: randomUUID() });
     await fixture.control.ready.promise;
     return runId;
   };

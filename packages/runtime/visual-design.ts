@@ -19,7 +19,7 @@ export interface VisualDesignRuntimeStatus {
 export const visualDesignInstructions = `\n\n当前阶段具备 NEXIOM 原生可视化设计能力（命名空间 nexiom_visual）。执行可视化任务时，由 Agent 使用 ensure_visual_libraries 在当前项目 outputs/visual-design 下创建 modeling（建模过程可视化库）与 paper（论文论述可视化库）。model 阶段优先为建模方法、过程、变量关系与初步结果设计素材；paper 阶段为具体论文论述、比较和结论设计素材；chart 阶段可完善两个库。用 list_visual_assets、get_visual_asset 阅读已有成果及来源，再用 create_visual_asset 创建包含真实数据、系列标签、配色、图例、结构位置的语义图，保存 SVG、图定义与可复现源码。create_visual_asset 也会自动创建两个库。仅承诺实际生成和核验的格式。
 两个素材库仅按设计阶段和用途归档，工作台统一汇总两个库，使用同一套调色与结构调整功能。工作台只编辑 Agent 创建的结构化图像。调色是识别图像语义元素后修改其源码配色并重新渲染；调整是移动图例、标题、绘图区、标注或结构节点等元素，以解决重叠和排版问题，不是亮度或对比度滤镜。按图像类别理解其结构，保留元素的稳定 ID 与语义对应关系。例如 A/B/C 三个成员在 D/E/F 三种情况下的生存能力分组条形图，应令 categories=[D,E,F]，series 为 A/B/C，每个系列带有标签、颜色与按 D/E/F 顺序排列的真实数据；图例颜色始终跟随对应系列。
 PS-FRAME-001：二维直角坐标数据图的绘图区必须由左、下、上、右四边组成完整矩形细框，四边样式统一，默认只在左、下显示刻度和标签；上、右不重复标注。边框与辅助线位于数据图形下方。分组条形图、折线图、散点图由原生渲染器固定执行，不提供隐藏上、右边框的选项；Python 模板在导出前执行同一规则。结构图、极坐标、三维图和连续色条不套用此矩形坐标框规则。
-绘图必须基于当前项目中的实际数据、计算结果或明确的概念/推导，purpose 说明图像用途和依据，sourcePaths 记录至少一个实际存在的资料文件的项目相对路径；概念图可先在项目中整理推导依据文档并引用。不得捏造数值或来源，不得将参考图库图片当作成果或注册进工作台。图表阶段若提供模板、色板与图库工具，可用于学习样式和选择配色；工作台无需 Python 或 MCP。旧模板工具导出的普通图片不能冒充可编辑素材，应使用结构化工具生成工作台所需图定义。规划模式只调用 list_visual_assets、get_visual_asset 与其他标记为只读的工具，不能创建文件夹或图像；写工具虽为延续会话保留声明，也仅执行模式可调用。网络关闭时不请求额外模型调用；模型参数使用 NEXIOM 当前供应商设置。`;
+绘图必须基于当前项目中的实际数据、计算结果或明确的概念/推导，purpose 说明图像用途和依据，sourcePaths 记录至少一个实际存在的资料文件的项目相对路径；概念图可先在项目中整理推导依据文档并引用。不得捏造数值或来源，不得将参考图库图片当作成果或注册进工作台。图表阶段若提供模板、色板与图库工具，可用于学习样式和选择配色；工作台无需 Python 或 MCP。旧模板工具导出的普通图片不能冒充可编辑素材，应使用结构化工具生成工作台所需图定义。网络关闭时不请求额外模型调用；模型参数使用 NEXIOM 当前供应商设置。`;
 
 export function resolveVisualDesignBundle(): string {
   const configured = process.env.NEXIOM_VISUAL_BUNDLE_ROOT;
@@ -204,7 +204,7 @@ export async function createVisualDesignTools(
     }
   }
   const definitions = [...visualWorkspaceDefinitions, ...pythonDefinitions];
-  const allowed = new Set(definitions.filter(tool => input.mode === "execute" || tool.readOnly === true).map(tool => tool.name));
+  const allowed = new Set(definitions.map(tool => tool.name));
   const workspaceTools = new Set(visualWorkspaceDefinitions.map(tool => tool.name));
   const lifetime = new AbortController();
   const signal = AbortSignal.any([input.signal, lifetime.signal]);
@@ -219,11 +219,11 @@ export async function createVisualDesignTools(
   return {
     close() { lifetime.abort(); },
     specs: [{ type: "namespace", name: "nexiom_visual", description: `NEXIOM 原生可视化：建模过程与论文论述素材库、语义元素、配色和结构编辑。${pythonFailure ? `模板渲染暂不可用：${pythonFailure} 结构化素材工具仍可使用。` : ""}`, tools: definitions.map(tool => ({
-      type: "function", name: tool.name, description: `${tool.description}${tool.readOnly ? "" : " 仅执行模式可调用；规划模式禁止写入。"}`, inputSchema: tool.inputSchema, deferLoading: false,
+      type: "function", name: tool.name, description: tool.description, inputSchema: tool.inputSchema, deferLoading: false,
     })) }],
     async call(namespace, tool, arguments_) {
       if (namespace !== "nexiom_visual" || !allowed.has(tool))
-        return { success: false, contentItems: [{ type: "inputText", text: "当前模式未授权或未提供此原生图表设计工具。规划模式只允许读取。" }] };
+        return { success: false, contentItems: [{ type: "inputText", text: "未提供此原生图表设计工具。" }] };
       let response: WorkerResponse;
       try {
         signal.throwIfAborted();
@@ -233,7 +233,7 @@ export async function createVisualDesignTools(
           if (!status?.python || !status.bundleRoot) throw new Error(pythonFailure || "模板渲染运行环境不可用。");
           response = await runVisualWorker(status.python, status.bundleRoot, {
             operation: "call", name: tool, arguments: arguments_, projectRoot: input.cwd,
-            mode: input.mode, network: input.mode === "execute" && input.settings.network,
+            mode: "execute", network: input.settings.network,
             runsDir: path.join(input.cwd, "outputs", "visual-design"),
             provider: {
               id: input.provider.id, name: input.provider.name, endpoint: input.provider.endpoint,

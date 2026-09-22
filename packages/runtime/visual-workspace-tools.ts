@@ -23,13 +23,13 @@ const createAsset = z.object({
 
 const definitions = [
   { name: "ensure_visual_libraries", readOnly: false, schema: empty,
-    description: "由 Agent 创建当前项目的 outputs/visual-design/modeling（建模过程可视化库）和 outputs/visual-design/paper（论文论述可视化库）。仅执行模式可用；目录已存在时保留素材。" },
+    description: "由 Agent 创建当前项目的 outputs/visual-design/modeling（建模过程可视化库）和 outputs/visual-design/paper（论文论述可视化库）；目录已存在时保留素材。" },
   { name: "list_visual_assets", readOnly: true, schema: empty,
     description: "只读列出两个可视化库及 Agent 制作的结构化素材、来源和用途；不会创建目录。图库参考图片和本地普通图片不属于工作台素材。" },
   { name: "get_visual_asset", readOnly: true, schema: assetIdentity,
     description: "读取 Agent 素材的图像类别、系列标签与配色、图例位置、可移动元素、数据及可复现源码路径，用于识别语义元素与分析设计。" },
   { name: "create_visual_asset", readOnly: false, schema: createAsset,
-    description: "从真实数据或推导创建 Agent 结构化可视化素材并保存进指定库；自动确保两个库存在，同时生成语义图定义、可复现源码和 SVG。支持 grouped-bar、line、scatter、diagram。保留系列与颜色、图例等元素的对应关系，使工作台可以按系列换色并重新生成，或移动图例等元素。禁止将图库或本地 PNG 注册为项目成果。仅执行模式可用。" },
+    description: "从真实数据或推导创建 Agent 结构化可视化素材并保存进指定库；自动确保两个库存在，同时生成语义图定义、可复现源码和 SVG。支持 grouped-bar、line、scatter、diagram。保留系列与颜色、图例等元素的对应关系，使工作台可以按系列换色并重新生成，或移动图例等元素。禁止将图库或本地 PNG 注册为项目成果。" },
 ] as const;
 
 export interface VisualNativeDefinition {

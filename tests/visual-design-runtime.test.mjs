@@ -81,7 +81,7 @@ async function fixture(t) {
 test("visual runtime isolates Python tools to chart stage and provider credentials", { skip: !python }, async t => {
   const { cwd, runtimeHome, bundle } = await fixture(t);
   const secret = "visual-own-secret";
-  const input = { cwd, stageId: "model", mode: "execute", provider, apiKey: secret,
+  const input = { cwd, stageId: "model", provider, apiKey: secret,
     settings: { network: true }, signal: new AbortController().signal, prompt: "draw" };
   const env = runtime.runtimeEnvironment("tools", runtimeHome);
   const modelingTools = await runtime.createVisualDesignTools(input, env, runtimeHome);
@@ -96,11 +96,11 @@ test("visual runtime isolates Python tools to chart stage and provider credentia
   assert.equal(env.OPENAI_API_KEY, undefined);
   assert.equal(env.PYTHONPATH, undefined);
   assert.equal(env.NEXIOM_VISUAL_PROVIDER_JSON, undefined);
-  const tools = await runtime.createVisualDesignTools({ ...input, stageId: "chart", mode: "plan" }, env, runtimeHome);
+  const tools = await runtime.createVisualDesignTools({ ...input, stageId: "chart" }, env, runtimeHome);
   const result = await tools.call("nexiom_visual", "health_check", {});
   assert.equal(result.success, true);
-  assert.deepEqual(JSON.parse(result.contentItems[0].text), { marker: "NEXIOM_NATIVE_VISUAL_CALLED", mode: "plan", network: false, has_key: true, host_key: false, env_key: false, project: cwd });
-  assert.equal((await tools.call("nexiom_visual", "render_preview", {})).success, false);
+  assert.deepEqual(JSON.parse(result.contentItems[0].text), { marker: "NEXIOM_NATIVE_VISUAL_CALLED", mode: "execute", network: true, has_key: true, host_key: false, env_key: false, project: cwd });
+  assert.equal((await tools.call("nexiom_visual", "render_preview", {})).success, true);
   assert.equal((await tools.call("unexpected_namespace", "health_check", {})).success, false);
   assert.ok(!JSON.stringify(env).includes(secret));
   assert.ok(!JSON.stringify(tools.specs).includes(secret));
@@ -114,10 +114,10 @@ test("visual runtime isolates Python tools to chart stage and provider credentia
   assert.deepEqual(await readdir(cwd), []);
 });
 
-for (const stageId of ["model", "chart", "paper"]) test(`semantic ${stageId} tools work without Python and planning never creates libraries`, async t => {
+for (const stageId of ["model", "chart", "paper"]) test(`semantic ${stageId} tools work without Python in the unified task flow`, async t => {
   const { cwd, runtimeHome, root } = await fixture(t);
   process.env.NEXIOM_VISUAL_BUNDLE_ROOT = path.join(root, "missing-bundle");
-  const input = { cwd, stageId, mode: "plan", provider,
+  const input = { cwd, stageId, provider,
     settings: { network: false }, signal: new AbortController().signal, prompt: "设计素材" };
   const tools = await runtime.createVisualDesignTools(input, {}, runtimeHome);
   t.after(() => tools.close());
@@ -127,12 +127,12 @@ for (const stageId of ["model", "chart", "paper"]) test(`semantic ${stageId} too
   assert.deepEqual(state.libraries.map(library => library.kind), ["modeling", "paper"]);
   assert.ok(state.libraries.every(library => !library.exists));
   assert.deepEqual(state.assets, []);
-  assert.equal((await tools.call("nexiom_visual", "ensure_visual_libraries", {})).success, false);
+  assert.equal((await tools.call("nexiom_visual", "ensure_visual_libraries", {})).success, true);
   assert.equal((await tools.call("nexiom_visual", "create_visual_asset", {})).success, false);
-  assert.deepEqual(await readdir(cwd), []);
+  assert.deepEqual(await readdir(cwd), ["outputs"]);
   const create = tools.specs[0].tools.find(tool => tool.name === "create_visual_asset");
   assert.deepEqual(create.inputSchema.properties.figure.properties.kind.enum, ["grouped-bar", "line", "scatter", "diagram"]);
-  assert.match(create.description, /仅执行模式/);
+  assert.doesNotMatch(create.description, /规划|执行模式/);
   if (stageId === "chart") assert.match(tools.specs[0].description, /模板渲染暂不可用/);
   tools.close();
   assert.equal((await tools.call("nexiom_visual", "list_visual_assets", {})).success, false);
@@ -143,7 +143,7 @@ test("semantic tools create both agent libraries and preserve editable series an
   process.env.NEXIOM_VISUAL_BUNDLE_ROOT = path.join(root, "missing-bundle");
   await mkdir(path.join(cwd, "inputs"));
   await writeFile(path.join(cwd, "inputs", "survival.csv"), "case,A,B,C\nD,10,20,30\nE,15,25,35\nF,20,30,40\n");
-  const input = { cwd, stageId: "model", mode: "execute", provider,
+  const input = { cwd, stageId: "model", provider,
     settings: { network: false }, signal: new AbortController().signal, prompt: "建模过程可视化" };
   const tools = await runtime.createVisualDesignTools(input, {}, runtimeHome);
   t.after(() => tools.close());
@@ -199,7 +199,7 @@ test("visual runtime rejects a Python override inside a personal Codex runtime",
 test("cancelling native visualization stops its Python worker and child processes", { skip: !python, timeout: 15_000 }, async t => {
   const { cwd, runtimeHome } = await fixture(t);
   const abort = new AbortController();
-  const tools = await runtime.createVisualDesignTools({ cwd, stageId: "chart", mode: "execute", provider,
+  const tools = await runtime.createVisualDesignTools({ cwd, stageId: "chart", provider,
     settings: { network: false }, signal: abort.signal, prompt: "test" }, runtime.runtimeEnvironment("tools", runtimeHome), runtimeHome);
   t.after(() => tools.close());
   const marker = path.join(cwd, "worker-pids.txt");
@@ -220,7 +220,7 @@ test("native gallery tool supplies actual image pixels with bounded metadata", {
   process.env.NEXIOM_VISUAL_BUNDLE_ROOT = path.resolve("packages/visualization-engine");
   const catalog = JSON.parse(await readFile(path.join(process.env.NEXIOM_VISUAL_BUNDLE_ROOT, "catalog.json"), "utf8"));
   const reference = catalog.references[0];
-  const tools = await runtime.createVisualDesignTools({ cwd, stageId: "chart", mode: "plan", provider,
+  const tools = await runtime.createVisualDesignTools({ cwd, stageId: "chart", provider,
     settings: { network: false }, signal: new AbortController().signal, prompt: "read gallery" }, runtime.runtimeEnvironment("tools", runtimeHome), runtimeHome);
   t.after(() => tools.close());
   const result = await tools.call("nexiom_visual", "get_visual_reference", { reference_id: reference.id });
@@ -229,7 +229,7 @@ test("native gallery tool supplies actual image pixels with bounded metadata", {
   assert.match(pixels?.imageUrl ?? "", /^data:image\/jpeg;base64,/);
   assert.ok(pixels.imageUrl.length < 3 * 1024 * 1024);
   assert.ok(!result.contentItems[0].text.includes("base64"));
-  assert.deepEqual(await readdir(cwd), []);
+  assert.deepEqual(await readdir(cwd), ["outputs"]);
 });
 
 const sse = (...events) => events.map(event => `event: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`).join("");
@@ -269,7 +269,7 @@ for (const stageId of ["model", "paper"]) test(`native ${stageId} agent creates 
   await new Promise(resolve => server.listen(0, "127.0.0.1", resolve));
   const runner = new runtime.CodexRuntime({ runtimeHome });
   const events = [];
-  for await (const event of runner.run({ cwd, stageId, mode: "execute", prompt: "根据 method.md 制作流程图并入库。",
+  for await (const event of runner.run({ cwd, stageId, prompt: "根据 method.md 制作流程图并入库。",
     provider: { ...provider, endpoint: `http://127.0.0.1:${server.address().port}/v1` }, apiKey: "semantic-test-secret",
     settings: { activeProviderId: provider.id, effort: "default", network: false }, signal: AbortSignal.timeout(25_000),
   })) events.push(event);
@@ -288,7 +288,7 @@ for (const stageId of ["model", "paper"]) test(`native ${stageId} agent creates 
   assert.ok(!JSON.stringify(requests).includes("semantic-test-secret"));
 });
 
-for (const scenario of ["fixture", "bundled-plan", "bundled-render"]) test(`native chart agent calls ${scenario} without exposing its key`, { skip: !python, timeout: 90_000 }, async t => {
+for (const scenario of ["fixture", "bundled-catalog", "bundled-render"]) test(`native chart agent calls ${scenario} without exposing its key`, { skip: !python, timeout: 90_000 }, async t => {
   const bundled = scenario !== "fixture";
   const rendering = scenario === "bundled-render";
   const { cwd, runtimeHome } = await fixture(t);
@@ -338,7 +338,7 @@ for (const scenario of ["fixture", "bundled-plan", "bundled-render"]) test(`nati
   const abort = new AbortController();
   const timer = setTimeout(() => abort.abort(), 75_000);
   t.after(() => clearTimeout(timer));
-  for await (const event of runner.run({ cwd, stageId: "chart", mode: rendering ? "execute" : "plan", prompt: "检查内置可视化组件。",
+  for await (const event of runner.run({ cwd, stageId: "chart", prompt: "检查内置可视化组件。",
     provider: { ...provider, endpoint: `http://127.0.0.1:${server.address().port}/v1` }, apiKey: secret,
     settings: { activeProviderId: provider.id, effort: "default", network: false }, signal: abort.signal,
   })) events.push(event);
@@ -367,7 +367,7 @@ for (const scenario of ["fixture", "bundled-plan", "bundled-render"]) test(`nati
     toolsToCall[0] = "render_preview";
     const threadId = events.find(event => event.type === "thread.started").thread_id;
     const resumed = [];
-    for await (const event of runner.run({ cwd, stageId: "chart", mode: "execute", threadId, prompt: "开始执行刚才的规划。",
+    for await (const event of runner.run({ cwd, stageId: "chart", threadId, prompt: "继续完成刚才的任务。",
       provider: { ...provider, endpoint: `http://127.0.0.1:${server.address().port}/v1` }, apiKey: secret,
       settings: { activeProviderId: provider.id, effort: "default", network: false }, signal: abort.signal,
     })) resumed.push(event);
@@ -375,7 +375,7 @@ for (const scenario of ["fixture", "bundled-plan", "bundled-render"]) test(`nati
     const executed = resumed.find(event => event.type === "item.completed" && event.item.type === "native_tool_call")?.item;
     assert.equal(executed?.status, "completed", JSON.stringify(resumed));
     assert.equal(executed.result.mode, "execute");
-    assert.ok(requests[2].includes("visual ready"), "Planning conversation remains present after switching to Execute");
+    assert.ok(requests[2].includes("visual ready"), "The conversation remains present across unified tasks");
     events.push(...resumed);
   }
   // Native tool results and inherited conversation must not expose credentials.
@@ -392,6 +392,6 @@ for (const scenario of ["fixture", "bundled-plan", "bundled-render"]) test(`nati
     const stored = await readFile(path.join(file.parentPath, file.name));
     assert.ok(!stored.includes(Buffer.from(secret)), `Credential persisted in ${file.name}`);
   }
-  if (!rendering) assert.deepEqual(await readdir(cwd), []);
+  if (!rendering) assert.deepEqual(await readdir(cwd), bundled ? ["outputs"] : []);
 });
 

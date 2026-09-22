@@ -1,0 +1,38 @@
+.nexiom-tooltip {
+  position: fixed;
+  z-index: 12000;
+  box-sizing: border-box;
+  max-width: min(22rem, calc(100vw - 16px));
+  margin: 0;
+  padding: 7px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  box-shadow: 0 12px 32px #00000055;
+  font-family: "NEXIOM UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 22px;
+  letter-spacing: 0;
+  font-synthesis: none;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  user-select: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.nexiom-tooltip[hidden] {
+  display: none;
+}
+
+:is(button, input, select, textarea):disabled[data-nexiom-title] {
+  pointer-events: auto;
+}
+
+:root[data-theme="light"] .nexiom-tooltip {
+  border-color: var(--strong-border);
+  background: #fff;
+  box-shadow: 0 10px 28px #00000024;
+}

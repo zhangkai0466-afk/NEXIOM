@@ -21,7 +21,8 @@ import {
   rename,
   unlink,
 } from "node:fs/promises";
-import { commandSchema } from "../../packages/contracts";
+import { commandSchema, type CoreResponse } from "../../packages/contracts";
+import { cleanStorage } from "../../packages/core/storage-cleanup";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -615,6 +616,35 @@ else {
       assertSender(event);
       await restoreSecrets;
       const command = commandSchema.parse(input);
+      if (command.type === "storage.inspect" || command.type === "storage.clear") {
+        const clear = command.type === "storage.clear";
+        const result = await request({ command }) as CoreResponse;
+        const logs = [{ id: "old-logs", label: "超过 7 天的旧启动日志", relative: "logs/startup.log.previous", olderThan: Date.now() - 7 * 86400000 }];
+        const local = cleanStorage(app.getPath("userData"), logs, clear);
+        if (clear && result.cleanup) {
+          result.cleanup.freedBytes += local.cleanup.freedBytes;
+          result.cleanup.deletedFiles += local.cleanup.deletedFiles;
+          result.cleanup.skippedFiles += local.cleanup.skippedFiles;
+          result.cleanup.warnings.push(...local.cleanup.warnings);
+        }
+        result.storage ??= { categories: [], warnings: [] };
+        const after = clear ? cleanStorage(app.getPath("userData"), logs) : local;
+        result.storage.categories.push(...after.storage.categories);
+        result.storage.warnings.push(...after.storage.warnings);
+        try {
+          const session = event.sender.session;
+          const before = await session.getCacheSize();
+          if (clear) await session.clearCache();
+          const bytes = clear ? await session.getCacheSize() : before;
+          result.storage.categories.push({ id: "http-cache", label: "页面资源缓存", bytes });
+          if (clear && result.cleanup) result.cleanup.freedBytes += Math.max(0, before - bytes);
+        } catch {
+          const warning = "页面资源缓存暂时无法访问，请稍后重试。";
+          result.storage.warnings.push(warning);
+          if (result.cleanup) { result.cleanup.warnings.push(warning); result.cleanup.skippedFiles++; }
+        }
+        return result;
+      }
       const changesSecret =
         command.type === "provider.upsert" &&
         (command.apiKey !== undefined || command.clearApiKey);

@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { mkdirSync } from "node:fs";
+import { lstatSync, mkdirSync, renameSync } from "node:fs";
 import {
   readdir,
   lstat,
@@ -13,6 +13,7 @@ import {
   accountProfileSchema,
   commandSchema,
   type CoreResponse,
+  type Command,
   type Project,
   type Thread,
   type Question,
@@ -31,6 +32,11 @@ import { readVisualCatalog, readVisualAsset } from "./visual-library";
 import { getVisualDesignRuntimeStatus } from "../runtime/visual-design";
 import { listVisualWorkspace, readVisualAsset as readAgentVisualAsset, saveVisualAsset, validateVisualEdit } from "../visualization/store";
 import { renderVisualFigure } from "../visualization/render";
+import { registerGeneratedFiles } from "../filesystem/generated-files";
+import { checkedFile, checkedRoot } from "../filesystem/safe-files";
+import { cleanStorage, coreCacheLocations } from "./storage-cleanup";
+import { previewProjectReset, recoverProjectResets, resetProject } from "./project-reset";
+import { TokenActivityLedger } from "./token-activity";
 import {
   importProjectRecord,
   readProjectRecord,
@@ -38,7 +44,7 @@ import {
 } from "./project-record";
 
 const now = () => new Date().toISOString();
-const schemaVersionCurrent = 9;
+const schemaVersionCurrent = 10;
 const projectChatNames = {
   reading: "赛题研读",
   attachments: "附件分析",
@@ -136,6 +142,7 @@ function initializeSchema(db: DatabaseSync, schemaVersion: number) {
       WHERE stageId IN ('overview','reading','attachments','delivery');
   `);
   const runColumns = columns(db, "agent_runs");
+  if (!runColumns.has("activityId")) db.exec("ALTER TABLE agent_runs ADD COLUMN activityId TEXT");
   if (!runColumns.has("providerId"))
     db.exec("ALTER TABLE agent_runs ADD COLUMN providerId TEXT");
   if (!runColumns.has("providerFingerprint"))
@@ -228,6 +235,8 @@ export class CoreService {
   private dirtyProjectRecords = new Set<string>();
   private projectRecordFailures = new Map<string, string>();
   private projectRecordTimer: NodeJS.Timeout | undefined;
+  private workspaceWrites = 0;
+  private tokenActivity!: TokenActivityLedger;
   constructor(
     private dataDir: string,
     private notify: () => void = () => {},
@@ -242,7 +251,11 @@ export class CoreService {
       if (schemaVersion > schemaVersionCurrent)
         throw new Error("工作空间版本高于当前应用，无法写入。");
       initializeSchema(this.db, schemaVersion);
+      this.tokenActivity = new TokenActivityLedger(this.db, path.resolve(dataDir));
+      this.tokenActivity.restoreBackups();
+      this.tokenActivity.backfill();
       this.transaction(() => initializeProviders(this.db, schemaVersion));
+      recoverProjectResets(path.resolve(dataDir), this.db);
       this.agent = new AgentCoordinator(
         this.db,
         {
@@ -253,6 +266,7 @@ export class CoreService {
           transaction: this.transaction.bind(this),
         },
         options.runner ?? new CodexRuntime({ runtimeHome: path.resolve(dataDir, "runtime") }),
+        this.tokenActivity,
       );
       const interrupted = this.db
         .prepare("SELECT * FROM runs WHERE status = 'running'")
@@ -277,6 +291,7 @@ export class CoreService {
           )
           .run();
       });
+      this.tokenActivity.recover();
       for (const row of this.db.prepare("SELECT id FROM projects").all())
         this.projectChanged(String(row.id));
       this.flushProjectRecords();
@@ -302,6 +317,7 @@ export class CoreService {
     this.dirtyProjectRecords.add(projectId);
   }
   private flushProjectRecords() {
+    this.tokenActivity?.saveBackup();
     clearTimeout(this.projectRecordTimer);
     this.projectRecordTimer = undefined;
     for (const projectId of [...this.dirtyProjectRecords]) {
@@ -467,6 +483,8 @@ export class CoreService {
   snapshot(): CoreResponse {
     return {
       snapshot: {
+        tokenActivity: this.tokenActivity.activities(),
+        ...(this.tokenActivity.warning ? { tokenActivityWarning: this.tokenActivity.warning } : {}),
         projects: this.db
           .prepare("SELECT * FROM projects ORDER BY createdAt")
           .all() as unknown as Project[],
@@ -530,6 +548,7 @@ export class CoreService {
       try {
         this.transaction(() => {
           imported = importProjectRecord(this.db, resolved, savedRecord);
+          this.tokenActivity.backfill();
           this.event(
             imported.project.id,
             imported.relocated ? "project.relocated" : "project.restored",
@@ -631,7 +650,47 @@ export class CoreService {
   async request(input: unknown): Promise<CoreResponse> {
     if (this.closed) throw new Error("核心已关闭。");
     const command = commandSchema.parse(input);
+    if ((command.type === "project.reset" || command.type === "storage.clear") && this.workspaceWrites)
+      throw new Error("文件或任务正在提交，请稍后再清理。");
+    const writes = ["file.import", "file.unimport", "memory.write", "visual.figure.save", "visual.image.save", "agent.submit", "message.submit", "project.create"].includes(command.type);
+    if (writes) this.workspaceWrites++;
+    try { return await this.executeCommand(command); }
+    finally { if (writes) this.workspaceWrites--; }
+  }
+
+  private async executeCommand(command: Command): Promise<CoreResponse> {
     switch (command.type) {
+      case "usage.export":
+        this.tokenActivity.saveBackup();
+        return { usageBackup: this.tokenActivity.export() };
+      case "usage.import": {
+        const recoveredActivities = this.tokenActivity.import(command.data);
+        this.publish();
+        return { ...this.snapshot(), recoveredActivities };
+      }
+      case "usage.recover": {
+        const recoveredActivities = this.tokenActivity.recover();
+        this.publish();
+        return { ...this.snapshot(), recoveredActivities };
+      }
+      case "storage.inspect":
+        return { storage: cleanStorage(this.dataDir, coreCacheLocations).storage };
+      case "storage.clear": {
+        if (this.db.prepare("SELECT id FROM runs WHERE status='running' LIMIT 1").get())
+          throw new Error("任务正在运行，请结束或停止任务后再清理缓存。");
+        const { cleanup } = cleanStorage(this.dataDir, coreCacheLocations, true);
+        return { cleanup, storage: cleanStorage(this.dataDir, coreCacheLocations).storage };
+      }
+      case "project.reset.preview":
+        return { resetPreview: previewProjectReset(this.db, this.project(command.projectId)) };
+      case "project.reset": {
+        const project = this.project(command.projectId);
+        const cleanup = resetProject(path.resolve(this.dataDir), this.db, project, command);
+        this.dirtyProjectRecords.delete(project.id);
+        this.projectRecordFailures.delete(project.id);
+        this.publish();
+        return { ...this.snapshot(), project, cleanup };
+      }
       case "visual.catalog":
         return { visualCatalog: await readVisualCatalog() };
       case "visual.palettes":
@@ -735,6 +794,7 @@ export class CoreService {
           }
         }
         const savedPath = `outputs/visual-design/edits/${savedName}`;
+        registerGeneratedFiles(project.root, [savedPath]);
         this.event(project.id, "visual.image.saved", `已导出 ${savedPath}。`);
         this.publish();
         return { savedPath };
@@ -1027,13 +1087,13 @@ export class CoreService {
           const runMap = new Map<string, string>();
           const runs = this.db.prepare("SELECT * FROM runs WHERE threadId=? ORDER BY rowid").all(source.id);
           const insertRun = this.db.prepare("INSERT INTO runs (id,threadId,projectId,status,createdAt,finishedAt) VALUES (?, ?, ?, ?, ?, ?)");
-          const insertAgentRun = this.db.prepare("INSERT INTO agent_runs (runId,mode,usage,providerId,providerFingerprint,runtimeConfig) VALUES (?, ?, ?, ?, ?, ?)");
+          const insertAgentRun = this.db.prepare("INSERT INTO agent_runs (runId,mode,usage,providerId,providerFingerprint,runtimeConfig,activityId) VALUES (?, ?, ?, ?, ?, ?, ?)");
           for (const run of runs) {
             const runId = randomUUID();
             runMap.set(String(run.id), runId);
             insertRun.run(runId, fork.id, projectId, run.status, run.createdAt, run.finishedAt);
             const agentRun = this.db.prepare("SELECT * FROM agent_runs WHERE runId=?").get(run.id);
-            if (agentRun) insertAgentRun.run(runId, agentRun.mode, agentRun.usage, agentRun.providerId, agentRun.providerFingerprint, agentRun.runtimeConfig);
+            if (agentRun) insertAgentRun.run(runId, agentRun.mode, agentRun.usage, agentRun.providerId, agentRun.providerFingerprint, agentRun.runtimeConfig, agentRun.activityId ?? agentRun.runId);
           }
           const insertItem = this.db.prepare("INSERT INTO agent_items (id,runId,threadId,sequence,status,payload,updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)");
           for (const item of this.db.prepare("SELECT * FROM agent_items WHERE threadId=? ORDER BY sequence").all(source.id)) {
@@ -1166,6 +1226,25 @@ export class CoreService {
             size: stat.size,
           },
         };
+      }
+      case "file.unimport": {
+        const project = await this.projectWorkspace(command.projectId);
+        if (this.workspaceWrites > 1 || this.db.prepare("SELECT id FROM runs WHERE projectId=? AND status='running' LIMIT 1").get(project.id))
+          throw new Error("项目仍有任务或文件操作正在进行，请稍后再移除赛题文件。");
+        const parts = command.path.replaceAll("\\", "/").split("/");
+        if (parts.length < 2 || parts[0].toLowerCase() !== "inputs" || parts.some(part => !part || part === "." || part === ".." || ignored.has(part.toLowerCase())))
+          throw new Error("只能移除 inputs 中的导入文件。");
+        const root = checkedRoot(project.root);
+        const source = checkedFile(root, parts.join("/"));
+        if (!lstatSync(source).isFile()) throw new Error("只能移除文件。");
+        // Keep a recoverable copy outside the material list, including files
+        // that the user placed directly in inputs rather than importing.
+        const backupDirectory = `.nexiom/removed-inputs/${randomUUID()}`;
+        mkdirSync(checkedFile(root, backupDirectory), { recursive: true });
+        renameSync(checkedFile(root, parts.join("/")), checkedFile(root, `${backupDirectory}/${parts.at(-1)!}`));
+        this.event(project.id, "file.unimported", `已移除 ${parts.join("/")}，副本保留在 ${backupDirectory}。`);
+        this.publish();
+        return {};
       }
       case "file.import": {
         const project = await this.projectWorkspace(command.projectId);

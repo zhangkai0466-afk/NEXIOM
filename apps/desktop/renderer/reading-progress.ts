@@ -82,6 +82,10 @@ export function readingSteps(items: AgentItem[], run: Run): ReadingStep[] {
   return result;
 }
 
+export function readingCanViewReport(steps: ReadingStep[], run: Run) {
+  return run.status === "running" && steps.some(step => step.kind === "writing" && step.status === "completed");
+}
+
 export function readingProgressNotice(steps: ReadingStep[], run: Run): string | undefined {
   if (run.status === "failed") return "研读失败";
   if (run.status === "cancelled") return "研读已停止";

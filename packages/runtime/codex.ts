@@ -9,6 +9,8 @@ import { createVisualDesignTools, visualDesignInstructions } from "./visual-desi
 import { supportsVisualWorkspace } from "./visual-workspace-tools";
 import { createReadingTools, readingWebSearchMode } from "./reading-tools";
 import { readingWorkflowInstructions } from "../contracts/reading-workflow";
+import { createAttachmentTools } from "./attachment-tools";
+import { attachmentWorkflowInstructions } from "../contracts/attachment-workflow";
 export { getVisualDesignRuntimeStatus, createVisualDesignTools, resolveVisualDesignBundle } from "./visual-design";
 
 const execute = promisify(execFile);
@@ -16,7 +18,7 @@ const instructions = `你是 NEXIOM，服务于全国大学生数学建模竞赛
 对问候和简单交流自然简短地回答。只有需要实际操作文件或工具的任务，才先说明简短行动计划，随后完成任务并验证；最终给出结果、文件路径、验证与未解决项。
 数学结论必须来自实际推导或实验；不得编造数据、实验成绩或文献。区分假设、计算结果和已核实事实。
 只操作用户选定的当前项目，附件默认在 inputs/。不要读取凭证或与任务无关的个人文件。不要自动提交、上传或推送。
-规划模式下只阅读和讨论，不修改研究文件；执行模式下完成获准任务。问候时无需复述模式或要求用户确认。缺少依赖时说明情况，不自动安装系统软件。
+根据用户目标自主判断需要讨论、读取、写入或运行工具，并完成必要验证；无需要求用户切换工作模式。缺少依赖时说明情况，不自动安装系统软件。
 不加载其他应用或父目录的 AGENTS.md、全局提示词、配置和技能。用户可见内容只包含必要的工具动作和结论，不输出隐藏思维链。数学公式使用 Markdown 的 $...$ 或 $$...$$ 分隔符。`;
 
 export function resolveCodexBinary(): { executable: string; pathDir: string } {
@@ -344,15 +346,15 @@ export class CodexRuntime implements AgentRunner {
       "shell_environment_policy.experimental_use_profile": false,
       ...(process.platform === "win32" ? { "windows.sandbox": "unelevated" } : {}),
       web_search: readingWebSearchMode(input),
-      "sandbox_workspace_write.network_access":
-        input.mode === "execute" && input.settings.network,
+      "sandbox_workspace_write.network_access": input.settings.network,
     };
     applyProviderRuntime(input.provider, input.apiKey, env, config);
-    const nativeTools = createReadingTools(input) ?? await createVisualDesignTools(input, env, this.runtimeHome);
+    const nativeTools = createReadingTools(input) ?? createAttachmentTools(input) ?? await createVisualDesignTools(input, env, this.runtimeHome);
     // Keep the stable application contract in baseInstructions only. Repeating it
     // here changes and lengthens the rendered prefix without adding behavior.
     const developerInstructions =
       (supportsVisualWorkspace(input.stageId) ? visualDesignInstructions : "") +
+      (input.attachmentTarget ? `\n\n${attachmentWorkflowInstructions}` : "") +
       (input.stageId === "reading" ? `\n\n${readingWorkflowInstructions}\n文献联网检索：${input.settings.network ? "已允许，使用 web_search 实际检索并核对原文。如果供应商不支持或检索失败，报告限制，不伪造结果。" : "未允许。不得绕过联网设置；将需要的来源和查询词列为待核对，不得声称已完成文献核验。"}` : "") +
       (input.stageId === "model" ? "\n\n建模阶段用户提出的是想法分享与共同讨论。评估其依据、适用条件和取舍；不要将所有人类建议称为人工纠偏，不要未经讨论就改写已确认的题意口径。" : "") +
       (input.projectMemory

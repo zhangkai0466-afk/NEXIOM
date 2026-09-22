@@ -138,7 +138,7 @@ test("legacy root projects cannot read, import, or run against the whole disk", 
     { type: "project.files", projectId },
     { type: "memory.read", projectId },
     { type: "file.import", projectId, name: "unsafe.txt", base64: Buffer.from("x").toString("base64") },
-    { type: "agent.submit", threadId, text: "执行", mode: "plan", executionConfirmed: false, clientRequestId: randomUUID() },
+    { type: "agent.submit", threadId, text: "执行", clientRequestId: randomUUID() },
   ]) await assert.rejects(core.request(command), error => {
     assert.match(error.message, /磁盘或文件系统根目录/);
     assert.ok(error.message.includes(path.parse(dir).root));

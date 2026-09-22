@@ -1,0 +1,25 @@
+.storage-total { display: flex; align-items: center; gap: 16px; padding: 24px; }
+.storage-total > div { display: grid; gap: 6px; flex: 1; }
+.storage-total span, .reset-scope > span { color: var(--muted); font-size: .875rem; }
+.storage-total strong { font-size: 1.75rem; font-weight: 550; }
+.cleanup-feedback { color: var(--text); padding: 12px 0; }
+.cleanup-project-path { display: block; overflow-wrap: anywhere; color: var(--muted); font-size: .8125rem; }
+.project-reset-panel { display: grid; gap: 16px; padding: 20px 22px 22px; }
+.project-reset-panel > footer { margin-top: 4px; }
+.project-reset-panel > p, .reset-scope p { margin: 0; line-height: 1.65; }
+.reset-scope { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.reset-scope p { margin-top: 6px; color: var(--muted); }
+.reset-output-option { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.reset-output-option input { width: 16px; height: 16px; margin: 3px 0; flex: 0 0 auto; accent-color: var(--accent); }
+.reset-output-option small { display: block; color: var(--muted); margin-top: 5px; }
+.reset-file-list { border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; }
+.reset-file-list summary { cursor: pointer; }
+.reset-file-list ul { list-style: none; padding: 0; margin: 12px 0 0; max-height: 160px; overflow-y: auto; }
+.reset-file-list li { display: flex; align-items: baseline; gap: 12px; padding: 6px 0; }
+.reset-file-list li span { flex: 1; overflow-wrap: anywhere; font-size: .8125rem; }
+.reset-file-list li small { white-space: nowrap; color: var(--muted); }
+.reset-name-confirmation { display: grid; gap: 8px; }
+.reset-name-confirmation input { width: 100%; padding: 10px 12px; border: 1px solid var(--strong-border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.cleanup-notice { display: flex; gap: 10px; align-items: center; padding: 12px 20px; border-bottom: 1px solid var(--border); }
+.cleanup-notice span { flex: 1; line-height: 1.5; }
+.modal.project-reset-modal { width: min(600px, calc(100vw - 32px)); }

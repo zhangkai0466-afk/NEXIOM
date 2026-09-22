@@ -90,7 +90,7 @@ async function setup(t, behavior) {
   await core.request({ type: "provider.upsert", provider: { id: "nexiom-default", name: "fixture", kind: "responses", endpoint: "http://127.0.0.1:1/v1", model: "fixture", auth: "none" } });
   await core.request({ type: "runtime.check" });
   const { thread } = await core.request({ type: "project.create", name: "Streaming fixture" });
-  const submit = () => core.request({ type: "agent.submit", threadId: thread.id, text: "Synthetic stream", mode: "plan", clientRequestId: randomUUID() });
+  const submit = () => core.request({ type: "agent.submit", threadId: thread.id, text: "Synthetic stream", clientRequestId: randomUUID() });
   return { core, submit, notifications: () => notifications };
 }
 

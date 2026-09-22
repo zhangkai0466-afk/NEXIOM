@@ -59,7 +59,7 @@ function nativeFixture(notifications, { clock } = {}) {
     executable: "fixture-native", env: {}, runtimeHome: "C:/fixture/runtime", config: {},
     baseInstructions: "Fixture",
     input: {
-      cwd: "C:/fixture/project", mode: "plan", prompt: "Fixture",
+      cwd: "C:/fixture/project", prompt: "Fixture",
       provider: { model: "fixture" }, settings: { network: false, effort: "default" },
       signal: abort.signal,
     },
@@ -84,6 +84,16 @@ test("a buffered flood of filtered native events yields to the event loop before
   assert.equal(completedAfterOtherWork, true, "filtered notifications must not monopolize microtasks");
   assert.deepEqual(fixture.requests.filter(value => value.id !== undefined).map(value => value.method),
     ["initialize", "thread/start", "turn/start"]);
+  assert.deepEqual(
+    fixture.requests.find(value => value.method === "turn/start").params.sandboxPolicy,
+    {
+      type: "workspaceWrite",
+      writableRoots: ["C:/fixture/project"],
+      networkAccess: false,
+      excludeTmpdirEnvVar: true,
+      excludeSlashTmp: true,
+    },
+  );
 });
 
 test("cancellation can interrupt a buffered flood even when notifications produce no UI events", async t => {

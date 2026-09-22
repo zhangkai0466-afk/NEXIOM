@@ -263,7 +263,7 @@ function portableContextPayload(payload: unknown, threadId?: string): string {
   });
 }
 
-function projectRecordFromDatabase(
+export function projectRecordFromDatabase(
   db: DatabaseSync,
   projectId: string,
   savedAt: string,
@@ -298,7 +298,7 @@ function projectRecordFromDatabase(
       events: rows(db, `SELECT * FROM events WHERE projectId=? OR runId IN (${runIds}) ORDER BY sequence`, projectId, projectId, projectId),
       agentRuns: rows(
         db,
-        `SELECT runId, mode, usage, NULL AS providerId, NULL AS providerFingerprint, NULL AS runtimeConfig
+        `SELECT runId, mode, usage, activityId, NULL AS providerId, NULL AS providerFingerprint, NULL AS runtimeConfig
          FROM agent_runs WHERE runId IN (${runIds}) ORDER BY rowid`,
         projectId,
         projectId,
@@ -319,7 +319,10 @@ function comparableProjectRecord(record: ProjectRecord): Omit<ProjectRecord, "sa
       ...record.records,
       events: record.records.events.filter((row) => row.type !== "project.record_failed"),
       agentRuns: record.records.agentRuns.map((row) => ({
-        ...row,
+        runId: row.runId,
+        mode: row.mode,
+        usage: row.usage,
+        activityId: row.activityId ?? row.runId,
         providerId: null,
         providerFingerprint: null,
         runtimeConfig: null,
@@ -432,6 +435,7 @@ function validateRelationships(record: ProjectRecord) {
     runThreads.set(runId, threadId);
   }
   for (const row of record.records.agentRuns) {
+    if (row.activityId != null) requiredUuid(row.activityId, "agentRuns.activityId");
     if (!runIds.has(requiredUuid(row.runId, "agentRuns.runId")))
       throw new Error("项目记录中的 agentRuns 关联了不存在的运行。");
     requiredEnum(row.mode, "agentRuns.mode", agentModes);
@@ -620,7 +624,7 @@ export function importProjectRecord(
       status === "running" ? new Date().toISOString() : optionalString(row.finishedAt, "runs.finishedAt"),
     );
   }
-  const insertAgentRun = db.prepare("INSERT INTO agent_runs (runId,mode,usage,providerId,providerFingerprint,runtimeConfig) VALUES (?, ?, ?, ?, ?, ?)");
+  const insertAgentRun = db.prepare("INSERT INTO agent_runs (runId,mode,usage,providerId,providerFingerprint,runtimeConfig,activityId) VALUES (?, ?, ?, ?, ?, ?, ?)");
   for (const row of record.records.agentRuns) {
     const runId = mapped(runMap, row.runId, "agentRuns.runId");
     insertAgentRun.run(
@@ -630,6 +634,7 @@ export function importProjectRecord(
       null,
       null,
       null,
+      row.activityId == null ? requiredUuid(row.runId, "agentRuns.runId") : requiredUuid(row.activityId, "agentRuns.activityId"),
     );
   }
   const insertAgentRequest = db.prepare("INSERT INTO agent_requests (id,digest,runId) VALUES (?, ?, ?)");

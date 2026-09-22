@@ -105,7 +105,7 @@ test("version 6 upgrade retains question threads and every dependent history rec
       PRAGMA foreign_keys=ON;
     `);
     db.prepare("INSERT INTO runs VALUES (?, ?, ?, 'succeeded', ?, ?)").run(runId, thread.id, project.id, createdAt, createdAt);
-    db.prepare("INSERT INTO agent_runs VALUES (?, 'plan', ?, 'nexiom-default', 'private-fingerprint', '{}')").run(runId, '{"input_tokens":8,"output_tokens":3}');
+    db.prepare("INSERT INTO agent_runs (runId,mode,usage,providerId,providerFingerprint,runtimeConfig) VALUES (?, 'plan', ?, 'nexiom-default', 'private-fingerprint', '{}')").run(runId, '{"input_tokens":8,"output_tokens":3}');
     db.prepare("INSERT INTO agent_requests VALUES (?, 'request-digest', ?)").run(requestId, runId);
     db.prepare("INSERT INTO agent_threads VALUES (?, 'private-engine-id', 'private-fingerprint')").run(thread.id);
     db.prepare("INSERT INTO agent_items VALUES ('historical-item', ?, ?, 1, 'completed', ?, ?)").run(runId, thread.id, '{"id":"message","type":"agent_message","text":"历史结果"}', createdAt);
@@ -128,7 +128,7 @@ test("version 6 upgrade retains question threads and every dependent history rec
     await core.request({ type: "thread.ensure", projectId: project.id, stageId });
   const inspected = new DatabaseSync(path.join(dir, "workspace.sqlite"));
   try {
-    assert.equal(inspected.prepare("PRAGMA user_version").get().user_version, 9);
+    assert.equal(inspected.prepare("PRAGMA user_version").get().user_version, 10);
     assert.equal(inspected.prepare("SELECT engineThreadId FROM agent_threads WHERE threadId=?").get(thread.id).engineThreadId, "private-engine-id");
     assert.equal(inspected.prepare("SELECT runId FROM agent_requests WHERE id=?").get(requestId).runId, runId);
     assert.deepEqual(inspected.prepare("PRAGMA foreign_key_check").all(), []);
@@ -174,7 +174,7 @@ test("each project dimension submits its own stage identity and conversation his
   await core.request({ type: "message.submit", threadId: old.id, text: "其他对话的专属历史", clientRequestId: randomUUID() });
   for (const [stageId, name] of Object.entries(stages)) {
     const { thread } = await core.request({ type: "thread.ensure", projectId: project.id, stageId });
-    const { runId } = await core.request({ type: "agent.submit", threadId: thread.id, text: `讨论${name}`, mode: "plan", clientRequestId: randomUUID() });
+    const { runId } = await core.request({ type: "agent.submit", threadId: thread.id, text: `讨论${name}`, clientRequestId: randomUUID() });
     for (let i = 0; i < 100 && core.snapshot().snapshot.runs.find(({ id }) => id === runId).status === "running"; i++)
       await new Promise((resolve) => setTimeout(resolve, 10));
     const snapshot = core.snapshot().snapshot;

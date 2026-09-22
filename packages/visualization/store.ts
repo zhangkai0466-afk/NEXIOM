@@ -4,6 +4,7 @@ import path from "node:path";
 import { z } from "zod";
 import { visualFigureSchema, visualLibrarySchema, type VisualAsset, type VisualAssetSummary, type VisualFigure, type VisualLibraryKind, type VisualWorkspaceState } from "./document";
 import { generateVisualSource, renderVisualFigure } from "./render";
+import { registerGeneratedFiles } from "../filesystem/generated-files";
 
 const WORKSPACE = "outputs/visual-design";
 const MAX_DOCUMENT_BYTES = 2 * 1024 * 1024;
@@ -273,6 +274,7 @@ async function writeSnapshot(root: string, metadata: z.infer<typeof metadataSche
     await rename((await checkedPath(root, pointerTemporary)).target, pointer.target);
     committed = true;
     const snapshot = `${relative}/rev-${metadata.revision}`;
+    registerGeneratedFiles(root, [`${relative}/current.json`, ...["figure.json", "render.mjs", "figure.svg", "meta.json"].map(name => `${snapshot}/${name}`)], [`${relative}/current.json`]);
     return { ...toSummary(metadata), origin: "agent", figure, svg: rendered.svg, elements: rendered.elements,
       documentPath: `${snapshot}/figure.json`, sourcePath: `${snapshot}/render.mjs`, imagePath: `${snapshot}/figure.svg` };
   } finally {

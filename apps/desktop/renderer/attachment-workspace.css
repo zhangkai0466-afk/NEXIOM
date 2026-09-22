@@ -1,0 +1,84 @@
+.attachment-workspace-layout {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.attachment-workspace-grid {
+  height: 100%;
+  min-width: calc(var(--attachment-outline-width) + var(--reading-correction-width) + 376px);
+  display: grid;
+  grid-template-columns: var(--attachment-outline-width) 8px minmax(360px, 1fr) 8px var(--reading-correction-width);
+  grid-template-areas: "outline outline-resizer report resizer correction";
+}
+.correction-closed .attachment-workspace-grid {
+  min-width: calc(var(--attachment-outline-width) + 368px);
+  grid-template-columns: var(--attachment-outline-width) 8px minmax(360px, 1fr);
+  grid-template-areas: "outline outline-resizer report";
+}
+.attachment-pane-divider {
+  position: relative;
+  cursor: col-resize;
+  touch-action: none;
+  background: var(--panel);
+}
+.attachment-pane-divider::after {
+  content: "";
+  position: absolute;
+  width: 2px;
+  height: 44px;
+  left: 3px;
+  top: calc(50% - 22px);
+  border-radius: 2px;
+  background: var(--strong-border);
+}
+.attachment-pane-divider:hover::after,
+.attachment-pane-divider:focus-visible::after { background: var(--link); }
+.attachment-pane-divider:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.attachment-workspace .attachment-outline {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 10px;
+  overflow: auto;
+  border-right: 1px solid var(--line);
+}
+.attachment-workspace .reading-outline-label { display: block; }
+.attachment-workspace .attachment-outline button { width: 100%; min-width: 0; flex: 0 0 auto; }
+.attachment-file-number { color: var(--faint); font: 0.75rem var(--mono); }
+.attachment-file-label { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.attachment-file-label strong { font-size: 0.875rem; font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attachment-file-label small { color: var(--muted); font-size: 0.75rem; }
+.attachment-file-label small[data-status="completed"] { color: var(--success); }
+.attachment-file-label small[data-status="failed"] { color: var(--danger); }
+.attachment-workspace .attachment-outline button > svg { flex-shrink: 0; color: var(--success); }
+.attachment-report { overflow-y: auto; min-width: 0; }
+.attachment-phase-chain {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  list-style: none;
+  margin: 4px 0 22px;
+  padding: 18px 8px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel);
+}
+.attachment-phase-chain li { position: relative; display: flex; flex-direction: column; align-items: center; gap: 9px; min-width: 0; }
+.attachment-phase-chain li:not(:last-child)::after { content: ""; position: absolute; top: 14px; width: calc(100% - 40px); height: 1px; left: calc(50% + 24px); background: var(--border); }
+.attachment-phase-chain strong { font-size: 0.9375rem; font-weight: 550; }
+.attachment-phase-chain small { color: var(--muted); font-size: 0.75rem; }
+.attachment-phase-chain li[data-status="pending"] { color: var(--faint); }
+.attachment-phase-chain li[data-status="completed"] small { color: var(--success); }
+.attachment-phase-chain li[data-status="failed"] small { color: var(--danger); }
+.attachment-progress-note { color: var(--muted); font-size: 0.8125rem; line-height: 1.7; margin: 0 0 22px; }
+.attachment-report-placeholder { display: flex; align-items: center; gap: 12px; padding: 30px 0; color: var(--muted); font-size: 0.875rem; }
+.attachment-saved-report { border-top: 1px solid var(--line); padding-top: 14px; margin-bottom: 22px; }
+.attachment-run-notice { display: flex; align-items: flex-start; gap: 12px; margin: 12px 20px; padding: 12px 15px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel); }
+.attachment-run-notice > svg { flex-shrink: 0; margin-top: 2px; color: var(--danger); }
+.attachment-run-notice > div { flex: 1; min-width: 0; }
+.attachment-run-notice strong { font-size: 0.875rem; }
+.attachment-run-notice p, .attachment-run-notice details { margin: 4px 0; font-size: 0.8125rem; color: var(--muted); line-height: 1.6; overflow-wrap: anywhere; }
+.attachment-run-notice summary { cursor: pointer; }
+.attachment-records { margin-top: 24px; border-top: 1px solid var(--line); padding-top: 14px; }
+.attachment-records > details { margin-top: 12px; }
+.attachment-workspace .reading-report-header { flex-wrap: wrap; gap: 14px; }

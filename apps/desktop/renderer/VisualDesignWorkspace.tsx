@@ -241,7 +241,7 @@ export function VisualDesignWorkspace({ projectId, onFilesChanged }: Props) {
     </header>
     <div className="vws-body">
       <aside className="vws-library" aria-label="Agent 可视化素材库">
-        <div className="vws-heading"><strong><Folder size={15} />全部可视化素材</strong><button className="vws-icon" title="刷新素材库" aria-label="刷新素材库" disabled={loading} onClick={() => void refresh().catch(cause => setError(errorMessage(cause)))}><RefreshCw size={14} /></button></div>
+        <div className="vws-heading"><strong><Folder size={16} />全部可视化素材</strong><button className="vws-icon" title="刷新素材库" aria-label="刷新素材库" disabled={loading} onClick={() => void refresh().catch(cause => setError(errorMessage(cause)))}><RefreshCw size={14} /></button></div>
         <label className="vws-search"><Search size={14} /><input aria-label="搜索项目素材" placeholder="搜索素材" value={query} onChange={event => setQuery(event.target.value)} /></label>
         <div className="vws-asset-list">{loading ? <div className="vws-small-empty"><LoaderCircle className="spin" size={19} />正在读取素材库</div> : filtered.length ? filtered.map(item => <AssetItem key={item.id} item={item} selected={asset?.id === item.id} onSelect={() => navigate(item)} />) : <div className="vws-small-empty"><FolderOpen size={24} /><span>{query ? "没有匹配的素材" : "暂无 Agent 生成的素材"}</span></div>}</div>
         <div className="vws-library-path"><span>全部素材</span><span>{workspace?.assets.length ?? 0} 张</span></div>

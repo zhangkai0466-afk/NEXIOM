@@ -104,6 +104,17 @@ export interface ThreadContext {
 
 export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("snapshot") }),
+  z.object({ type: z.literal("usage.export") }),
+  z.object({ type: z.literal("usage.import"), data: z.string().max(16 * 1024 * 1024) }),
+  z.object({ type: z.literal("usage.recover") }),
+  z.object({ type: z.literal("storage.inspect") }),
+  z.object({ type: z.literal("storage.clear") }),
+  z.object({ type: z.literal("project.reset.preview"), projectId: z.string().uuid() }),
+  z.object({
+    type: z.literal("project.reset"), projectId: z.string().uuid(),
+    revision: z.string().length(64), deleteGenerated: z.boolean().default(false),
+    confirmationName: z.string().max(80).default(""),
+  }),
   z.object({ type: z.literal("runtime.check") }),
   z.object({ type: z.literal("visual.catalog") }),
   z.object({ type: z.literal("visual.palettes") }),
@@ -150,8 +161,6 @@ export const commandSchema = z.discriminatedUnion("type", [
     type: z.literal("agent.submit"),
     threadId: z.string().uuid(),
     text: z.string().trim().min(1).max(20000),
-    mode: z.enum(["plan", "execute"]),
-    executionConfirmed: z.boolean().default(false),
     clientRequestId: z.string().uuid(),
   }),
   z.object({
@@ -217,10 +226,34 @@ export const commandSchema = z.discriminatedUnion("type", [
     name: z.string().min(1).max(200),
     base64: z.string().max(14000000),
   }),
+  z.object({
+    type: z.literal("file.unimport"),
+    projectId: z.string().uuid(),
+    path: z.string().min(1).max(1000),
+  }),
   z.object({ type: z.literal("run.cancel"), runId: z.string().uuid() }),
 ]);
 
 export type Command = z.infer<typeof commandSchema>;
+export interface StorageSummary {
+  categories: { id: string; label: string; bytes: number }[];
+  warnings: string[];
+}
+export interface CleanupResult {
+  freedBytes: number;
+  deletedFiles: number;
+  skippedFiles: number;
+  warnings: string[];
+}
+export interface ProjectResetPreview {
+  revision: string;
+  threads: number;
+  messages: number;
+  runs: number;
+  generatedFiles: { path: string; size: number }[];
+  preservedFiles: number;
+  warnings: string[];
+}
 export interface Project {
   id: string;
   name: string;
@@ -266,6 +299,18 @@ export interface Run {
   providerFingerprint?: string | null;
   runtimeConfig?: string | null;
 }
+export interface TokenActivity {
+  id: string;
+  runId: string | null;
+  source: "run" | "native";
+  kind: "agent";
+  createdAt: string;
+  finishedAt: string | null;
+  usage: string | null;
+  runtimeConfig: string | null;
+  nativeThreadId: string | null;
+  nativeTurnId: string | null;
+}
 export interface CoreEvent {
   id: string;
   projectId: string;
@@ -276,6 +321,8 @@ export interface CoreEvent {
   createdAt: string;
 }
 export interface Snapshot {
+  tokenActivity: TokenActivity[];
+  tokenActivityWarning?: string;
   projects: Project[];
   questions: Question[];
   threads: Thread[];
@@ -303,6 +350,11 @@ export interface FileContent {
   size: number;
 }
 export interface CoreResponse {
+  usageBackup?: string;
+  recoveredActivities?: number;
+  storage?: StorageSummary;
+  cleanup?: CleanupResult;
+  resetPreview?: ProjectResetPreview;
   visualWorkspace?: VisualWorkspaceState;
   visualFigure?: VisualAsset;
   visualPreview?: { svg: string; elements: VisualElement[] };

@@ -469,6 +469,7 @@ export class AppServerEvents {
           cachedInputTokens: number(last.cachedInputTokens),
           cacheWriteInputTokens: number(last.cacheWriteInputTokens),
         },
+        ...(this.usage ? [{ type: "usage.updated" as const, usage: this.usage }] : []),
       ];
     }
     if (method === "turn/completed") {
@@ -540,7 +541,7 @@ export async function* runAppServer(options: {
   input.signal.addEventListener("abort", abort, { once: true });
   try {
     await connection.request("initialize", {
-      clientInfo: { name: "nexiom", title: "NEXIOM", version: "0.6.7" },
+      clientInfo: { name: "nexiom", title: "NEXIOM", version: "0.6.25" },
       capabilities: { experimentalApi: true },
     });
     connection.notify("initialized");
@@ -550,7 +551,7 @@ export async function* runAppServer(options: {
       // project/ancestor .codex configuration, instructions, hooks or MCPs.
       cwd: options.runtimeHome,
       approvalPolicy: "never",
-      sandbox: input.mode === "plan" ? "read-only" : "workspace-write",
+      sandbox: "workspace-write",
       config: options.config,
       baseInstructions: options.baseInstructions,
       ...(options.developerInstructions
@@ -582,16 +583,13 @@ export async function* runAppServer(options: {
       threadId,
       cwd: input.cwd,
       approvalPolicy: "never",
-      sandboxPolicy:
-        input.mode === "plan"
-          ? { type: "readOnly", networkAccess: false }
-          : {
-              type: "workspaceWrite",
-              writableRoots: [input.cwd],
-              networkAccess: input.settings.network,
-              excludeTmpdirEnvVar: true,
-              excludeSlashTmp: true,
-            },
+      sandboxPolicy: {
+        type: "workspaceWrite",
+        writableRoots: [input.cwd],
+        networkAccess: input.settings.network,
+        excludeTmpdirEnvVar: true,
+        excludeSlashTmp: true,
+      },
       input: [{ type: "text", text: input.prompt, text_elements: [] }],
       summary: "none",
       ...(input.settings.effort !== "default"
@@ -601,7 +599,7 @@ export async function* runAppServer(options: {
     const turnId = string(object(started.turn).id);
     if (!turnId) throw new Error("Codex 未返回任务标识。");
     activeTurnId = turnId;
-    yield { type: "turn.started" };
+    yield { type: "turn.started", thread_id: threadId, turn_id: turnId };
     const adapter = new AppServerEvents(turnId, !input.threadId, input.stageId === "reading");
     for await (const event of connection.notifications()) {
       input.signal.throwIfAborted();

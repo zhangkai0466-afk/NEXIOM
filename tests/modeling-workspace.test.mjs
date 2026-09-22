@@ -104,7 +104,7 @@ test("conversation menu actions persist, move and fork history, and delete all d
   const db = new DatabaseSync(path.join(dir, "workspace.sqlite"));
   try {
     assert.deepEqual(db.prepare("PRAGMA foreign_key_check").all(), []);
-    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 9);
+    assert.equal(db.prepare("PRAGMA user_version").get().user_version, 10);
   } finally {
     db.close();
   }
@@ -150,7 +150,7 @@ test("version 4 conversations and messages migrate without losing their original
   assert.equal(core.snapshot().snapshot.projects.length, 0);
   assert.equal(core.snapshot().snapshot.messages.length, 0);
   const inspected = new DatabaseSync(path.join(dir, "workspace.sqlite"));
-  assert.equal(inspected.prepare("PRAGMA user_version").get().user_version, 9);
+  assert.equal(inspected.prepare("PRAGMA user_version").get().user_version, 10);
   assert.deepEqual(inspected.prepare("PRAGMA foreign_key_check").all(), []);
   inspected.close();
 });
@@ -210,7 +210,7 @@ test("agent receives and records the current problem and stage without importing
   const { project, thread: old } = await core.request({ type: "project.create", name: "储能赛题" });
   await core.request({ type: "message.submit", threadId: old.id, text: "其他对话不能隐式注入的内容", clientRequestId: randomUUID() });
   const { thread } = await core.request({ type: "thread.create", projectId: project.id, stageId: "validation", questionName: "问题二" });
-  const { runId } = await core.request({ type: "agent.submit", threadId: thread.id, text: "检查数据泄露", mode: "plan", clientRequestId: randomUUID() });
+  const { runId } = await core.request({ type: "agent.submit", threadId: thread.id, text: "检查数据泄露", clientRequestId: randomUUID() });
   for (let i = 0; i < 100 && core.snapshot().snapshot.runs.find(({ id }) => id === runId).status === "running"; i++)
     await new Promise((resolve) => setTimeout(resolve, 10));
   const run = core.snapshot().snapshot.runs.find(({ id }) => id === runId);

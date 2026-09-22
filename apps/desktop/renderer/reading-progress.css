@@ -19,14 +19,23 @@
   scrollbar-gutter: stable both-edges;
 }
 .reading-progress[data-history="true"] .reading-progress-viewport { padding-top: 72px; }
+.reading-progress-stage {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  max-width: 100%;
+}
 .reading-progress-chain {
   list-style: none;
   flex: 0 0 auto;
   width: max-content;
   max-width: 100%;
   padding: 0;
-  margin: auto;
+  margin: 0;
 }
+.reading-progress-view { margin-top: 28px; animation: reading-view-pop 420ms cubic-bezier(.22,1,.36,1) both; }
 .reading-progress-step {
   position: relative;
   min-height: 40px;
@@ -103,12 +112,13 @@
 .reading-research-setting { margin: 10px auto 0; padding: 6px; color: var(--muted); font-size: 12px; }
 @keyframes reading-step-enter { from { opacity: 0; translate: 0 8px; } to { opacity: 1; translate: 0 0; } }
 @keyframes reading-link-enter { from { opacity: 0; transform: scaleY(0); } to { opacity: 1; transform: scaleY(1); } }
-.reading-progress[data-history="true"] :is(.reading-progress-action, .reading-progress-link),
-:root[data-reduce-motion="true"] :is(.reading-progress-action, .reading-progress-link) { animation: none; }
+@keyframes reading-view-pop { from { opacity: 0; translate: 0 10px; } to { opacity: 1; translate: 0 0; } }
+.reading-progress[data-history="true"] :is(.reading-progress-action, .reading-progress-link, .reading-progress-view),
+:root[data-reduce-motion="true"] :is(.reading-progress-action, .reading-progress-link, .reading-progress-view) { animation: none; }
 /* Finished pixels release their compositor layers after fading out. */
 .reading-progress .nexiom-task-icon:not([data-task-status="running"]) .thinking-pixel-trail > span::before,
 .reading-progress .nexiom-task-icon:not([data-task-status="running"]) .thinking-pixel-trail > span::after { will-change: auto; }
-@media (prefers-reduced-motion: reduce) { .reading-progress-action, .reading-progress-link { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .reading-progress-action, .reading-progress-link, .reading-progress-view { animation: none; } }
 @media (max-width: 540px) {
   .reading-progress-viewport { padding-inline: 24px; }
   .reading-progress-action { font-size: 20px; }

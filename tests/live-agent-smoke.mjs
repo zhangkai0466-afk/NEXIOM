@@ -57,8 +57,6 @@ try {
     type: "agent.submit",
     threadId: thread.id,
     text: "在当前目录创建 solve.py，使用 Python 标准库对 x=[1,2,3,4]、y=[3,5,7,9] 做最小二乘直线拟合，实际运行并生成 result.json，字段为 slope、intercept、rmse。不要联网或安装依赖。最后用三句话报告方法、结果和验证口令。",
-    mode: "execute",
-    executionConfirmed: true,
     clientRequestId: randomUUID(),
   });
   const firstState = await wait(first.runId);
@@ -82,8 +80,6 @@ try {
     type: "agent.submit",
     threadId: thread.id,
     text: "不要调用工具，直接根据上一轮上下文回复 slope、intercept、rmse 结果，以及项目记忆中的核验口令。只需一句话。",
-    mode: "plan",
-    executionConfirmed: false,
     clientRequestId: randomUUID(),
   });
   const nextState = await wait(next.runId);

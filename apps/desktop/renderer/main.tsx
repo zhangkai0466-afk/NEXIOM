@@ -5,6 +5,7 @@ import "./styles.css";
 import "katex/dist/katex.min.css";
 import { applyStoredTypography, applyTheme, initialTheme } from "./Appearance";
 import { StartupBoundary } from "./StartupBoundary";
+import { TooltipLayer } from "./tooltip";
 
 applyTheme(initialTheme());
 applyStoredTypography();
@@ -12,6 +13,7 @@ applyStoredTypography();
 createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <StartupBoundary>
+      <TooltipLayer />
       {import.meta.env.DEV && new URLSearchParams(window.location.search).get("preview") === "startup"
         ? <StartupPreview />
         : <Startup />}

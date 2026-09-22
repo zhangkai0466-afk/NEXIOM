@@ -6,7 +6,7 @@ Agent 在建模、图表设计、论文写作阶段都可调用原生可视化�
 
 可视化设计任务在项目对话中发起，设计用途由用户与 Agent 在对话中确定。工作台只负责统一汇集已生成素材、调色、结构调整和保存修订，不提供新建设计入口或设计用途弹窗。
 
-执行模式下由 Agent 调用 `ensure_visual_libraries` 创建目录，或由 `create_visual_asset` 在生成第一张图时创建：
+Agent 按需调用 `ensure_visual_libraries` 创建目录，或由 `create_visual_asset` 在生成第一张图时创建：
 
 ```text
 outputs/visual-design/
@@ -90,4 +90,4 @@ Python 模板在导出前恢复四边，并在 Matplotlib 实际绘制后检查�
 - `packages/runtime/visual-workspace-tools.ts`：Agent 原生工具。
 - `apps/desktop/renderer/VisualDesignWorkspace.tsx`：统一编辑工作台。
 
-测试覆盖系列与图例配色同步、结构位置变化、源码重现、路径边界、预览不落盘、两库统一读写、修订冲突、规划模式禁止写入，以及建模/论文 Agent 的工具调用链路。
+测试覆盖系列与图例配色同步、结构位置变化、源码重现、路径边界、预览不落盘、两库统一读写、修订冲突，以及建模/论文 Agent 的工具调用链路。

@@ -1,18 +1,35 @@
+@font-face {
+  font-family: "NEXIOM Wordmark";
+  src: url("../../../assets/fonts/openai-sans/OpenAISans-Semibold.woff2") format("woff2");
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+}
 .modeling-sidebar { padding: 0 12px; font-family: "Segoe UI Variable Text", "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; }
-.modeling-sidebar .brand { height: 58px; min-height: 58px; padding-left: 10px; }
+.modeling-sidebar .brand { height: 58px; min-height: 58px; padding-left: 10px; gap: 10px; }
+.modeling-sidebar .brand > .nexiom-mark { width: 19px; height: 28px; }
+.modeling-sidebar .brand > span { font-family: "NEXIOM Wordmark", "Segoe UI", sans-serif; font-size: 1.2857rem; font-weight: 600; letter-spacing: -.025em; }
 .modeling-layers { position: relative; flex: 1; min-height: 0; overflow: hidden; }
 .modeling-layer { position: absolute; inset: 0; display: flex; flex-direction: column; padding: 4px 0 12px; transition: transform 240ms cubic-bezier(.2,.75,.25,1), opacity 200ms ease, visibility 240ms; }
-.modeling-library { transform: translateX(0); opacity: 1; }
+.modeling-library { transform: translateX(0); opacity: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; }
 .modeling-workspace { transform: translateX(102%); opacity: 0; visibility: hidden; }
 .modeling-inside .modeling-library { transform: translateX(-102%); opacity: 0; visibility: hidden; }
 .modeling-inside .modeling-workspace { transform: translateX(0); opacity: 1; visibility: visible; }
-.modeling-add-project, .modeling-casual-chat, .modeling-back, .modeling-project, .modeling-dimension { min-height: 39px; width: 100%; justify-content: flex-start; padding: 9px 10px; border-radius: 8px; text-align: left; gap: 10px; }
-.modeling-add-project { margin-bottom: 4px; flex-shrink: 0; }
-.modeling-casual-chat { margin-bottom: 15px; flex-shrink: 0; color: var(--text); }
+.modeling-casual-chat, .modeling-back, .modeling-project, .modeling-dimension { min-height: 39px; width: 100%; justify-content: flex-start; padding: 9px 10px; border-radius: 8px; text-align: left; gap: 10px; }
+.modeling-casual-heading { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+.modeling-casual-chat { flex: 1; min-width: 0; width: auto; color: var(--text); }
+.modeling-casual-add { width: 29px; height: 29px; flex: 0 0 29px; padding: 0; border-radius: 6px; color: var(--muted); }
+.modeling-casual-threads { padding: 2px 2px 10px; }
+.modeling-casual-threads:empty { padding: 0; }
+.modeling-casual-threads .modeling-thread { padding-left: 10px; }
 .modeling-casual-chat > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.modeling-casual-chat.active { background: var(--selected); }
+.modeling-casual-chat > svg:last-child { color: var(--faint); transition: transform 220ms ease; }
+.modeling-casual-chat[aria-expanded="false"] > svg:last-child { transform: rotate(-90deg); }
+.modeling-list-reveal { display: grid; flex: 0 0 auto; grid-template-rows: 0fr; opacity: 0; transform: translateY(-6px); transition: grid-template-rows 280ms cubic-bezier(.22,1,.36,1), opacity 180ms ease, transform 280ms cubic-bezier(.22,1,.36,1); }
+.modeling-list-reveal.open { grid-template-rows: 1fr; opacity: 1; transform: translateY(0); }
+.modeling-list-reveal-inner { min-height: 0; overflow: hidden; }
 .modeling-back { color: var(--muted); flex-shrink: 0; }
-.modeling-project-section { position: relative; display: flex; align-items: center; min-height: 34px; margin: 0 2px 3px; color: var(--faint); flex-shrink: 0; }
+.modeling-project-section { position: relative; display: flex; align-items: center; min-height: 34px; margin: 8px 2px 3px; color: var(--faint); flex-shrink: 0; }
 .modeling-project-section-toggle { min-width: 0; height: 32px; padding: 0 7px; gap: 5px; color: inherit; font-size: 0.9375rem; }
 .modeling-project-section-toggle > svg { transition: transform 160ms ease; }
 .modeling-project-section-toggle[aria-expanded="false"] > svg { transform: rotate(-90deg); }
@@ -20,9 +37,8 @@
 .modeling-project-section-actions > button { width: 29px; height: 29px; padding: 0; border-radius: 6px; color: inherit; }
 .modeling-library-menu { position: absolute; z-index: 20; top: 32px; right: 2px; width: 154px; padding: 5px; border: 1px solid var(--border); border-radius: 9px; background: var(--panel); box-shadow: 0 10px 28px #0003; }
 .modeling-library-menu button { width: 100%; min-height: 34px; padding: 7px 9px; border-radius: 6px; justify-content: flex-start; font-size: 0.9375rem; }
-.modeling-project-list, .modeling-dimensions { overflow: auto; min-height: 0; flex: 1; padding: 2px; }
-.modeling-project-list { transition: opacity 140ms ease; }
-.modeling-project-list.collapsed { flex: 0 0 0; height: 0; padding-block: 0; opacity: 0; overflow: hidden; }
+.modeling-dimensions { overflow: auto; min-height: 0; flex: 1; padding: 2px; }
+.modeling-project-list { padding: 2px; }
 .modeling-project-row { display: flex; align-items: center; min-width: 0; margin-bottom: 3px; border-radius: 8px; color: var(--text); font-size: 1rem; font-weight: 400; }
 .modeling-project-row:hover, .modeling-project-row:focus-within { background: var(--hover); }
 .modeling-project { flex: 1; min-width: 0; width: auto; color: inherit; }
@@ -104,5 +120,9 @@
 :root[data-theme="light"] .modeling-thread { color: var(--text); }
 .modeling-thread-dialog .modal-form select { background: var(--panel); padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
 :root[data-reduce-motion="true"] .modeling-layer, :root[data-reduce-motion="true"] .modeling-disclosure svg { transition: none; }
+:root[data-reduce-motion="true"] .modeling-list-reveal,
+:root[data-reduce-motion="true"] .modeling-casual-chat > svg:last-child,
+:root[data-reduce-motion="true"] .modeling-project-section-toggle > svg { transition: none; }
 :root[data-reduce-motion="true"] .modeling-update-button:has(.lucide-loader-circle) svg { animation: none; }
 @media (prefers-reduced-motion: reduce) { .modeling-layer, .modeling-disclosure svg { transition: none; } .modeling-update-button:has(.lucide-loader-circle) svg { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .modeling-list-reveal, .modeling-casual-chat > svg:last-child, .modeling-project-section-toggle > svg { transition: none; } }

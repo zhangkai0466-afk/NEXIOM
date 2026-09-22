@@ -20,9 +20,11 @@
 .vws-save:disabled { opacity: .42; }
 .vws-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 15rem minmax(180px, 1fr) 16.5rem; overflow-x: auto; overflow-y: hidden; }
 .vws-library, .vws-inspector { min-width: 0; min-height: 0; background: var(--panel); }
-.vws-library { display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--border); padding: 12px 10px 0; }
-.vws-heading { display: flex; align-items: center; justify-content: space-between; gap: 7px; }
-.vws-heading strong { min-width: 0; display: inline-flex; align-items: center; gap: 7px; font-weight: 550; font-size: .9375rem; overflow-wrap: anywhere; }
+.vws-library { display: flex; flex-direction: column; gap: 10px; border-right: 1px solid var(--border); padding: 12px 12px 0; }
+.vws-heading { display: flex; align-items: center; justify-content: space-between; gap: 7px; min-height: 32px; }
+.vws-heading .vws-icon { width: 28px; height: 28px; flex-basis: 28px; }
+.vws-heading strong, .vws-heading h2 { font-family: "NEXIOM UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; font-size: 16px; font-weight: 550; line-height: 24px; font-synthesis: none; }
+.vws-heading strong { min-width: 0; display: inline-flex; align-items: center; gap: 7px; overflow-wrap: anywhere; }
 .vws-folders { display: flex; flex-direction: column; gap: 3px; }
 .vws-folders button { display: flex; align-items: center; gap: 7px; min-height: 2.375rem; padding: 6px 8px; border-radius: 4px; text-align: left; color: var(--muted); }
 .vws-folders button.active { color: var(--text); background: var(--hover); }
@@ -60,9 +62,9 @@
 .vws-status { min-height: 2rem; flex-shrink: 0; padding: 6px 10px; display: flex; justify-content: space-between; gap: 10px; color: var(--muted); font-size: .8125rem; background: var(--panel); border-top: 1px solid var(--border); }
 .vws-status span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vws-inspector { overflow: auto; border-left: 1px solid var(--border); }
-.vws-inspector section { padding: 15px 14px; border-bottom: 1px solid var(--border); }
+.vws-inspector section { padding: 16px; border-bottom: 1px solid var(--border); }
 .vws h2 { margin: 0 0 12px; font-size: .9375rem; font-weight: 550; overflow-wrap: anywhere; }
-.vws-heading h2 { margin: 0; }
+.vws-heading h2 { margin: 0; font-family: "NEXIOM UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; font-size: 16px; font-weight: 550; line-height: 24px; font-synthesis: none; }
 .vws-elements { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; max-height: 250px; overflow: auto; }
 .vws-elements button { display: flex; align-items: center; gap: 8px; padding: 7px; min-height: 2.375rem; border-radius: 4px; text-align: left; }
 .vws-elements button > span:not(.vws-dot) { flex: 1; min-width: 0; overflow-wrap: anywhere; }
@@ -98,7 +100,7 @@
   .vws-header { gap: 8px; padding-inline: 10px; }
   .vws-title > span { max-width: 150px; }
   .vws-modes button { min-width: 59px; padding-inline: 8px; }
-  .vws-inspector section { padding-inline: 11px; }
+  .vws-inspector section { padding-inline: 12px; }
   .vws-actions { gap: 0; }
 }
 @container (max-width: 630px) {

@@ -34,13 +34,14 @@ function reducedMotion() {
   return document.documentElement.dataset.reduceMotion === "true" || matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function ReadingProgress({ run, items, onCancel, onBack, backLabel = "返回研读报告", history = false }: {
+export function ReadingProgress({ run, items, onCancel, onBack, backLabel = "返回研读报告", history = false, onViewReport }: {
   run: Run;
   items: AgentItem[];
   onCancel: () => void;
   onBack?: () => void;
   backLabel?: string;
   history?: boolean;
+  onViewReport?: () => void;
 }) {
   const steps = useMemo(() => readingSteps(items, run), [items, run]);
   const viewport = useRef<HTMLDivElement>(null);
@@ -133,13 +134,16 @@ export function ReadingProgress({ run, items, onCancel, onBack, backLabel = "返
         following.current = atEnd;
         setShowLatest(!atEnd);
       }}>
-      <motion.ol className="reading-progress-chain" layout={history || reducedMotion() ? false : "position"}
-        layoutDependency={`${steps.length}:${tail?.id}:${completed}`}
-        transition={{ layout: { duration: 0.36, ease: [0.22, 1, 0.36, 1] } }}
-        aria-live={history ? "off" : "polite"} aria-relevant="additions text">
-        {steps.map((step, index) => <ReadingAction key={step.id} {...step} final={completed && index === steps.length - 1} arrivalDelay={history ? 0 : arrivals[index]} />)}
-      </motion.ol>
-      {notice && <p className="reading-progress-notice" data-empty={!steps.length} role="status">{notice}</p>}
+      <div className="reading-progress-stage">
+        <motion.ol className="reading-progress-chain" layout={history || reducedMotion() ? false : "position"}
+          layoutDependency={`${steps.length}:${tail?.id}:${completed}`}
+          transition={{ layout: { duration: 0.36, ease: [0.22, 1, 0.36, 1] } }}
+          aria-live={history ? "off" : "polite"} aria-relevant="additions text">
+          {steps.map((step, index) => <ReadingAction key={step.id} {...step} final={completed && index === steps.length - 1} arrivalDelay={history ? 0 : arrivals[index]} />)}
+        </motion.ol>
+        {notice && <p className="reading-progress-notice" data-empty={!steps.length} role="status">{notice}</p>}
+        {onViewReport && <button className="reading-progress-view primary-button" type="button" onClick={onViewReport}>查看报告</button>}
+      </div>
     </motion.div>
     {onBack && <button className="reading-progress-back secondary-button" type="button" onClick={onBack}><ArrowLeft size={15} />{backLabel}</button>}
     <div className="reading-progress-controls">

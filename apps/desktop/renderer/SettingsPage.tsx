@@ -7,6 +7,7 @@ import {
   CircleHelp,
   FolderOpen,
   Info,
+  HardDrive,
   LoaderCircle,
   Search,
   Settings2,
@@ -27,9 +28,10 @@ import { AppearanceSettings, type AppearanceState } from "./Appearance";
 import { ModelSettings } from "./ModelSettings";
 import { ContextDetails, ProjectMemoryEditor } from "./ProjectContext";
 import { AccountSettings } from "./AccountSettings";
+import { StorageSettings } from "./StorageSettings";
 
 export type SettingsCategory =
-  "account" | "general" | "appearance" | "model" | "memory" | "about";
+  "account" | "general" | "appearance" | "model" | "memory" | "storage" | "about";
 const categories = [
   {
     id: "account",
@@ -66,6 +68,10 @@ const categories = [
     group: "Agent",
     icon: BookOpen,
     terms: "项目 目录 MEMORY 上下文 窗口 tokens 压缩 会话恢复",
+  },
+  {
+    id: "storage", label: "存储与清理", group: "应用", icon: HardDrive,
+    terms: "缓存 清理 存储 磁盘 空间 日志",
   },
   {
     id: "about",
@@ -105,6 +111,7 @@ export function SettingsPage({
   const [providerBusy, setProviderBusy] = useState(false);
   const [providerDirty, setProviderDirty] = useState(false);
   const [accountBusy, setAccountBusy] = useState(false);
+  const [storageBusy, setStorageBusy] = useState(false);
   const [accountDirty, setAccountDirty] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -114,7 +121,7 @@ export function SettingsPage({
   const lastSettings = useRef(JSON.stringify(snapshot.settings));
   const dirty = !sameSettings(settings, baseline);
   const anyDirty = dirty || providerDirty || accountDirty;
-  const blocked = busy || providerBusy || accountBusy;
+  const blocked = busy || providerBusy || accountBusy || storageBusy;
   const filtered = categories.filter((item) =>
     `${item.label} ${item.terms}`
       .toLowerCase()
@@ -195,10 +202,12 @@ export function SettingsPage({
     setConfirmLeave(false);
   }
   const panels: Record<SettingsCategory, ReactNode> = {
+    storage: <StorageSettings running={snapshot.runs.some(run => run.status === "running")} onBusyChange={setStorageBusy} />,
     account: (
       <AccountSettings
         profile={snapshot.account}
-        runs={snapshot.runs}
+        runs={snapshot.tokenActivity}
+        usageWarning={snapshot.tokenActivityWarning}
         onSaved={onSaved}
         onDirtyChange={setAccountDirty}
         onBusyChange={setAccountBusy}

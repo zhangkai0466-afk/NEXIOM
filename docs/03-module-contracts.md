@@ -33,10 +33,8 @@
 | `project.open` | path、期望模式 | projectId、schemaVersion、leaseState |
 | `thread.create` | projectId、title | threadId |
 | `turn.submit` | threadId、文本/附件、clientRequestId | messageId、runId 或 queued 状态 |
-| `plan.approve` | planRevisionId、expectedRevision、scope | approvalId、执行范围 |
 | `run.pause` / `run.cancel` | runId、reason | 当前状态；停止完成另发事件 |
 | `task.resume` | taskId、原 runId、恢复决定 | 新 runId |
-| `approval.resolve` | approvalId、决定、expectedRevision | 生效或 stale 状态 |
 | `artifact.open` | artifactId | 受控预览句柄，不返回任意路径执行权限 |
 | `events.read` | projectId、afterSequence、limit | 有序事件及 nextSequence |
 

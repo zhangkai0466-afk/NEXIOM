@@ -190,7 +190,6 @@ enabled = true
   const input = {
     prompt: "你好",
     cwd,
-    mode: "plan",
     settings: {
       activeProviderId: provider.id,
       effort: "default",
@@ -234,7 +233,7 @@ enabled = true
 
   exerciseTool = true;
   const toolEvents = [];
-  for await (const event of runner.run({ ...input, mode: "execute", prompt: "Write the requested native-tool.txt fixture." }))
+  for await (const event of runner.run({ ...input, prompt: "Write the requested native-tool.txt fixture." }))
     toolEvents.push(event);
   assert.ok(toolEvents.some(event => event.type === "turn.completed"));
   assert.ok(toolEvents.some(event => event.item?.type === "command_execution" && event.item.exit_code === 0), JSON.stringify({ events: toolEvents, output: JSON.parse(requests[4]?.body ?? "{}").input?.filter(item => item.type === "function_call_output") }));

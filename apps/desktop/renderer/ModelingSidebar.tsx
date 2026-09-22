@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { Archive, ArchiveRestore, ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, Eye, EyeOff, FileText, FolderInput, FolderOpen, GitFork, LayoutDashboard, LoaderCircle, MessageSquare, MoreHorizontal, PanelTopOpen, Paperclip, Pencil, Plus, Settings2, ShieldCheck, Trash2, X } from "lucide-react";
+import { Archive, ArchiveRestore, ArrowLeft, BookOpen, Check, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, Eye, EyeOff, FileText, FolderInput, FolderOpen, GitFork, LayoutDashboard, LoaderCircle, MessageSquare, MoreHorizontal, PanelTopOpen, Paperclip, Pencil, Plus, RotateCcw, Settings2, ShieldCheck, Trash2, X } from "lucide-react";
 import type { AccountProfile, AgentItem, ConversationStage, Project, Question, Run, Thread } from "../../../packages/contracts";
 import { readPreference, writePreference } from "./preferences";
 import { PaperWritingIcon } from "./PaperWritingIcon";
 import { VisualizationIcon } from "./VisualizationIcon";
 import { AgentTaskIcon } from "./AgentTaskStatus";
 import { AGENT_TASK_STATES, getCurrentAgentTaskKind } from "./agent-task-state";
-import logo from "../../../assets/brand/nexiom-desktop-icon-1024.png";
+import { NexiomMark } from "./NexiomMark";
 import "./modeling-navigation.css";
 
 export const dimensions = [
@@ -40,17 +40,19 @@ function ModelingIcon({ size = 18 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="-128 -128 1280 1280" className="modeling-hierarchy-icon" aria-hidden="true"><path d="M896 682.666667V469.333333h-341.333333V341.333333H768V0H256v341.333333h213.333333v128h-341.333333V682.666667H0v341.333333h341.333333V682.666667H213.333333V554.666667h597.333334V682.666667H682.666667v341.333333h341.333333V682.666667h-128zM256 768v170.666667H85.333333V768h170.666667z m85.333333-512V85.333333h341.333334v170.666667H341.333333z m597.333334 682.666667H768V768h170.666667v170.666667z" /></svg>;
 }
 
-function SidebarAgentActivity({ run, items }: { run?: Run; items: AgentItem[] }) {
+function SidebarAgentActivity({ run, items, casual = false }: { run?: Run; items: AgentItem[]; casual?: boolean }) {
   if (!run) return null;
-  const kind = getCurrentAgentTaskKind(items, run.id, run.mode === "plan" ? "planning" : "thinking");
+  const kind = casual ? "thinking" : getCurrentAgentTaskKind(items, run.id, "thinking");
   return <span className="nexiom-task-sidebar-activity" role="img" aria-label={AGENT_TASK_STATES[kind].label} title={AGENT_TASK_STATES[kind].label}><AgentTaskIcon kind={kind} size={12} /></span>;
 }
 
-export function ModelingSidebar({ projects, project, threads, questions, runs, agentItems = [], account, inside, casualSelected, dimension, threadId, busy, onAddProject, onCasualChat, onEnterProject, onRenameProject, onRemoveProject, onBack, onDimension, onThread, onRenameThread, onUnreadThread, onArchiveThread, onDeleteThread, onMoveThread, onCopyThread, onForkThread, onOpenThreadWindow, onAddThread, onSettings, onUpdate }: {
+export function ModelingSidebar({ projects, project, threads, casualThreads = [], questions, runs, agentItems = [], account, inside, casualSelected, dimension, threadId, busy, onAddProject, onCasualChat, onAddCasualThread, onEnterProject, onRenameProject, onRemoveProject, onResetProject, onBack, onDimension, onThread, onRenameThread, onUnreadThread, onArchiveThread, onDeleteThread, onMoveThread, onCopyThread, onForkThread, onOpenThreadWindow, onAddThread, onSettings, onUpdate }: {
   projects: Project[]; project?: Project; threads: Thread[]; questions: Question[]; runs: Run[]; agentItems?: AgentItem[]; account: AccountProfile;
+  casualThreads?: Thread[];
   inside: boolean; casualSelected: boolean; dimension: Dimension; threadId: string; busy: boolean;
   onAddProject: () => void; onCasualChat: () => void; onEnterProject: (id: string) => void; onBack: () => void;
-  onRenameProject: (project: Project) => void; onRemoveProject: (project: Project) => void;
+  onAddCasualThread: () => void;
+  onRenameProject: (project: Project) => void; onRemoveProject: (project: Project) => void; onResetProject: (project: Project) => void;
   onDimension: (id: Dimension) => void; onThread: (thread: Thread) => void; onRenameThread: (thread: Thread) => void;
   onUnreadThread: (thread: Thread, unread: boolean) => void;
   onArchiveThread: (thread: Thread, archived: boolean) => void; onDeleteThread: (thread: Thread) => void;
@@ -66,11 +68,13 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
   const [updating, setUpdating] = useState(false);
   const [updateError, setUpdateError] = useState("");
   const [projectsExpanded, setProjectsExpanded] = useState(() => readPreference("nexiom.projectsExpanded") !== "false");
+  const [casualExpanded, setCasualExpanded] = useState(() => readPreference("nexiom.casualExpanded") !== "false");
   const [libraryMenuOpen, setLibraryMenuOpen] = useState(false);
   const [projectMenu, setProjectMenu] = useState<{ project: Project; triggerId: string; top: number; left: number } | null>(null);
   const [threadMenu, setThreadMenu] = useState<{ thread: Thread; top: number; left: number } | null>(null);
   const [threadSubmenu, setThreadSubmenu] = useState<"project" | "copy" | "fork" | null>(null);
   const [archivedExpanded, setArchivedExpanded] = useState<Record<string, boolean>>({});
+  const [casualArchivedExpanded, setCasualArchivedExpanded] = useState(false);
   const sidebar = useRef<HTMLElement>(null);
   const accountMenu = useRef<HTMLDivElement>(null);
   const accountButton = useRef<HTMLButtonElement>(null);
@@ -85,6 +89,8 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
   const previousLayer = useRef(inside);
   useEffect(() => { writePreference("nexiom.expandedStages", JSON.stringify(expanded)); }, [expanded]);
   useEffect(() => { writePreference("nexiom.projectsExpanded", String(projectsExpanded)); }, [projectsExpanded]);
+  useEffect(() => { writePreference("nexiom.casualExpanded", String(casualExpanded)); }, [casualExpanded]);
+  useEffect(() => { if (casualSelected && threadId) setCasualExpanded(true); }, [casualSelected, threadId]);
   useEffect(() => {
     if (!libraryMenuOpen) return;
     const outside = (event: PointerEvent) => {
@@ -109,10 +115,10 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
     if (previousLayer.current === inside) return;
     previousLayer.current = inside;
     requestAnimationFrame(() => {
-      const target = inside ? sidebar.current?.querySelector<HTMLButtonElement>(".modeling-back") : sidebar.current?.querySelector<HTMLButtonElement>(`[data-project-id="${project?.id}"]`) ?? sidebar.current?.querySelector<HTMLButtonElement>(".modeling-add-project");
+      const target = inside ? sidebar.current?.querySelector<HTMLButtonElement>(".modeling-back") : casualSelected ? sidebar.current?.querySelector<HTMLButtonElement>(".modeling-casual-chat") : sidebar.current?.querySelector<HTMLButtonElement>(`[data-project-id="${project?.id}"]`) ?? sidebar.current?.querySelector<HTMLButtonElement>(".modeling-project-section-toggle");
       target?.focus({ preventScroll: true });
     });
-  }, [inside, project?.id]);
+  }, [inside, project?.id, casualSelected]);
   useEffect(() => {
     if (!accountOpen) return;
     settingsButton.current?.focus();
@@ -209,7 +215,7 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
     }
     const bounds = anchor.getBoundingClientRect();
     const menuWidth = 214;
-    const menuHeight = 88;
+    const menuHeight = 128;
     const margin = 8;
     const left = Math.max(margin, Math.min(bounds.right - menuWidth, window.innerWidth - menuWidth - margin));
     const below = bounds.bottom + 5;
@@ -239,6 +245,23 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
     setThreadMenu({ thread: item, top, left });
   };
   const toggle = (stage: ConversationStage) => setExpanded((value) => ({ ...value, [`${project?.id}:${stage}`]: !value[`${project?.id}:${stage}`] }));
+  const activeCasualThreads = casualThreads.filter((item) => !item.archivedAt).sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+  const archivedCasualThreads = casualThreads.filter((item) => item.archivedAt).sort((left, right) => right.archivedAt!.localeCompare(left.archivedAt!));
+  const renderCasualThread = (item: Thread) => <div className={`modeling-thread-row ${item.archivedAt ? "archived" : ""}`} key={item.id} onContextMenu={(event) => {
+    event.preventDefault();
+    const anchor = event.currentTarget.querySelector<HTMLButtonElement>(".modeling-thread-more");
+    if (anchor) openThreadMenu(item, anchor, false, { x: event.clientX, y: event.clientY });
+  }}>
+    <button className={`modeling-thread ${casualSelected && threadId === item.id ? "active" : ""} ${item.unread ? "unread" : ""}`} aria-current={casualSelected && threadId === item.id ? "page" : undefined} title={item.title} disabled={busy} onClick={() => onThread(item)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameThread(item); } }}>
+      <span>{item.title}</span>
+      {item.unread && <span className="modeling-unread" aria-label="未读" />}
+      <SidebarAgentActivity run={runs.find((run) => run.threadId === item.id && run.status === "running")} items={agentItems} casual />
+    </button>
+    <button className="modeling-thread-more" aria-label={`${item.title}的对话菜单`} aria-haspopup="menu" aria-expanded={threadMenu?.thread.id === item.id} aria-controls={threadMenu?.thread.id === item.id ? "modeling-thread-menu" : undefined} title="对话菜单" disabled={busy} onClick={(event) => openThreadMenu(item, event.currentTarget)} onKeyDown={(event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openThreadMenu(item, event.currentTarget, false); }
+      if (event.key === "F2") { event.preventDefault(); onRenameThread(item); }
+    }}><MoreHorizontal size={15} /></button>
+  </div>;
   const updateBlocked = busy || runs.some((run) => run.status === "running");
   const updateLabel = updating
     ? "正在构建并安装最新修改"
@@ -258,13 +281,30 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
     }
   };
   return <aside ref={sidebar} className={`sidebar modeling-sidebar ${inside ? "modeling-inside" : ""}`} aria-label="赛题项目导航">
-    <div className="brand"><img src={logo} alt="" /><span>NEXIOM</span></div>
+    <div className="brand"><NexiomMark /><span>NEXIOM</span></div>
     <div className="modeling-layers">
       <section className="modeling-layer modeling-library" inert={inside} aria-hidden={inside} aria-label="赛题项目列表">
-        <button className="modeling-add-project" onClick={onAddProject} disabled={busy}><Plus size={18} />添加</button>
-        <button className={`modeling-casual-chat ${casualSelected ? "active" : ""}`} aria-current={casualSelected ? "page" : undefined} onClick={onCasualChat} disabled={busy}><MessageSquare size={18} /><span>随便聊聊</span></button>
+        <div className="modeling-casual-heading">
+          <button className="modeling-casual-chat" aria-expanded={casualExpanded} aria-controls="casual-conversations" onClick={() => {
+            if (!casualThreads.length) { setCasualExpanded(true); onCasualChat(); return; }
+            setCasualExpanded((value) => !value);
+            if (!casualExpanded) onCasualChat();
+          }} disabled={busy}><MessageSquare size={18} /><span>随便聊聊</span><ChevronDown size={14} /></button>
+          <button className="modeling-casual-add" aria-label="新建随便聊聊对话" title="新建对话" onClick={() => { setCasualExpanded(true); onAddCasualThread(); }} disabled={busy}><Plus size={17} /></button>
+        </div>
+        <div id="casual-conversations" className={`modeling-list-reveal ${casualExpanded ? "open" : ""}`} aria-hidden={!casualExpanded} inert={!casualExpanded}>
+          <div className="modeling-list-reveal-inner">
+            <nav className="modeling-casual-threads" aria-label="随便聊聊对话列表">
+              {activeCasualThreads.map(renderCasualThread)}
+              {!!archivedCasualThreads.length && <div className="modeling-archived">
+                <button className="modeling-archived-toggle" aria-expanded={casualArchivedExpanded} onClick={() => setCasualArchivedExpanded((value) => !value)}><ChevronRight size={13} /><Archive size={13} /><span>已归档</span><small>{archivedCasualThreads.length}</small></button>
+                {casualArchivedExpanded && archivedCasualThreads.map(renderCasualThread)}
+              </div>}
+            </nav>
+          </div>
+        </div>
         <div className="modeling-project-section" ref={projectHeader}>
-          <button className="modeling-project-section-toggle" aria-expanded={projectsExpanded} onClick={() => setProjectsExpanded((value) => !value)}><span>项目</span><ChevronDown size={15} /></button>
+          <button className="modeling-project-section-toggle" aria-expanded={projectsExpanded} aria-controls="sidebar-projects" onClick={() => setProjectsExpanded((value) => !value)}><span>项目</span><ChevronDown size={15} /></button>
           <div className="modeling-project-section-actions">
             <button aria-label="项目选项" aria-haspopup="menu" aria-expanded={libraryMenuOpen} onClick={() => setLibraryMenuOpen((value) => !value)}><MoreHorizontal size={17} /></button>
             <button aria-label="添加项目" title="添加项目" onClick={onAddProject} disabled={busy}><Plus size={18} /></button>
@@ -274,16 +314,20 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
             <button role="menuitem" onClick={() => { setLibraryMenuOpen(false); setProjectsExpanded((value) => !value); }}><ChevronDown size={16} />{projectsExpanded ? "收起项目" : "展开项目"}</button>
           </div>}
         </div>
-        <nav className={`modeling-project-list ${projectsExpanded ? "expanded" : "collapsed"}`} aria-label="已添加的赛题项目" aria-hidden={!projectsExpanded} inert={!projectsExpanded}>
-          {projects.map((item) => {
-            const triggerId = `library:${item.id}`;
-            const name = projectDisplayName(item);
-            return <div className="modeling-project-row" key={item.id}>
-              <button data-project-id={item.id} className="modeling-project" onClick={() => onEnterProject(item.id)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameProject(item); } }}><FolderOpen size={18} /><span>{name}</span><SidebarAgentActivity run={runs.find((run) => run.projectId === item.id && run.status === "running")} items={agentItems} /></button>
-              <button className="modeling-project-more" aria-label={`${name}的项目菜单`} aria-haspopup="menu" aria-expanded={projectMenu?.triggerId === triggerId} title="项目菜单" onClick={(event) => openProjectMenu(item, triggerId, event.currentTarget)}><MoreHorizontal size={16} /></button>
-            </div>;
-          })}
-        </nav>
+        <div id="sidebar-projects" className={`modeling-list-reveal ${projectsExpanded ? "open" : ""}`} aria-hidden={!projectsExpanded} inert={!projectsExpanded}>
+          <div className="modeling-list-reveal-inner">
+            <nav className="modeling-project-list" aria-label="已添加的赛题项目">
+              {projects.map((item) => {
+                const triggerId = `library:${item.id}`;
+                const name = projectDisplayName(item);
+                return <div className="modeling-project-row" key={item.id}>
+                  <button data-project-id={item.id} className="modeling-project" onClick={() => onEnterProject(item.id)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameProject(item); } }}><FolderOpen size={18} /><span>{name}</span><SidebarAgentActivity run={runs.find((run) => run.projectId === item.id && run.status === "running")} items={agentItems} /></button>
+                  <button className="modeling-project-more" aria-label={`${name}的项目菜单`} aria-haspopup="menu" aria-expanded={projectMenu?.triggerId === triggerId} title="项目菜单" onClick={(event) => openProjectMenu(item, triggerId, event.currentTarget)}><MoreHorizontal size={16} /></button>
+                </div>;
+              })}
+            </nav>
+          </div>
+        </div>
       </section>
       <section className="modeling-layer modeling-workspace" inert={!inside} aria-hidden={!inside} aria-label="项目内工作维度">
         <button className="modeling-back" onClick={onBack}><ArrowLeft size={17} />所有赛题</button>
@@ -340,6 +384,7 @@ export function ModelingSidebar({ projects, project, threads, questions, runs, a
     </div>
     {projectMenu && createPortal(<div ref={projectMenuElement} className="modeling-project-menu" role="menu" aria-label={`${projectDisplayName(projectMenu.project)}的项目菜单`} style={{ top: projectMenu.top, left: projectMenu.left }}>
       <button ref={projectMenuButton} role="menuitem" onClick={() => { const item = projectMenu.project; setProjectMenu(null); onRenameProject(item); }}><Pencil size={15} />重命名项目</button>
+      <button className="modeling-project-remove" role="menuitem" disabled={busy} onClick={() => { const item = projectMenu.project; setProjectMenu(null); onResetProject(item); }}><RotateCcw size={16} />重置项目</button>
       <button className="modeling-project-remove" role="menuitem" onClick={() => { const item = projectMenu.project; setProjectMenu(null); onRemoveProject(item); }}><X size={16} />从 NEXIOM 中移除</button>
     </div>, document.body)}
     {threadMenu && createPortal(<div id="modeling-thread-menu" ref={threadMenuElement} className="modeling-thread-menu" role="menu" aria-label={`${threadMenu.thread.title}的对话菜单`} style={{ top: threadMenu.top, left: threadMenu.left }}>

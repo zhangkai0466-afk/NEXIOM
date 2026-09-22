@@ -44,7 +44,7 @@ test("continuous output checkpoints its portable record without rewriting it on 
   await core.request({ type: "runtime.check" });
   const { project, thread } = await core.request({ type: "project.create", name: "Streaming checkpoint" });
   const { runId } = await core.request({ type: "agent.submit", threadId: thread.id,
-    text: "Local fixture", mode: "plan", clientRequestId: randomUUID() });
+    text: "Local fixture", clientRequestId: randomUUID() });
   const recordPath = path.join(project.root, ".nexiom", "project.json");
   const readRecord = async () => JSON.parse(await readFile(recordPath, "utf8"));
   const textInRecord = record => {

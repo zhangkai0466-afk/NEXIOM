@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, readFile, writeFile } from "node:fs/promises";
+import { mkdtemp, rm, readFile, writeFile, rename } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { createHash, randomUUID } from "node:crypto";
@@ -71,12 +71,10 @@ async function settled(core, runId) {
   }
   throw new Error("Fixture run did not terminate");
 }
-const requestFor = (thread, mode = "plan") => ({
+const requestFor = (thread) => ({
   type: "agent.submit",
   threadId: thread.id,
   text: "Test task",
-  mode,
-  executionConfirmed: false,
   clientRequestId: randomUUID(),
 });
 async function* success() {
@@ -127,7 +125,7 @@ test("agent runs and tool history are mirrored into the selected project folder"
   }
   assert.equal(record.records.runs.find((item) => item.id === runId).status, "succeeded");
   const recordedAgentRun = record.records.agentRuns.find((item) => item.runId === runId);
-  assert.equal(recordedAgentRun.mode, "plan");
+  assert.equal(recordedAgentRun.mode, "execute");
   assert.match(recordedAgentRun.usage, /input_tokens/);
   assert.equal(recordedAgentRun.providerId, null);
   assert.equal(recordedAgentRun.providerFingerprint, null);
@@ -268,13 +266,10 @@ test("legacy local Codex configuration cannot be recreated or activated through 
   assert.equal(core.snapshot().snapshot.settings.activeProviderId, "nexiom-default");
 });
 
-test("execution requires explicit confirmation, and request replay does not run twice", async (t) => {
+test("a submitted task starts directly, and request replay does not run twice", async (t) => {
   const runtime = runner(success);
   const { core, thread } = await setup(t, runtime);
-  const command = requestFor(thread, "execute");
-  await assert.rejects(core.request(command), /需要确认/);
-  assert.equal(core.snapshot().snapshot.runs.length, 0);
-  command.executionConfirmed = true;
+  const command = requestFor(thread);
   const { runId } = await core.request(command);
   const state = await settled(core, runId);
   assert.equal(state.runs[0].status, "succeeded");
@@ -288,19 +283,16 @@ test("execution requires explicit confirmation, and request replay does not run 
     /不一致/,
   );
 });
-test("subsequent turns resume the engine thread with the current mode", async (t) => {
+test("subsequent tasks resume the engine thread without a user-selected mode", async (t) => {
   const runtime = runner(success);
   const { core, thread } = await setup(t, runtime);
   const first = await core.request(requestFor(thread));
   await settled(core, first.runId);
-  const second = await core.request({
-    ...requestFor(thread, "execute"),
-    executionConfirmed: true,
-  });
+  const second = await core.request(requestFor(thread));
   await settled(core, second.runId);
   assert.equal(runtime.calls[0].threadId, undefined);
   assert.equal(runtime.calls[1].threadId, "engine-thread-1");
-  assert.equal(runtime.calls[1].mode, "execute");
+  assert.equal("mode" in runtime.calls[1], false);
 });
 test("a failed or incomplete stream never becomes a successful run", async (t) => {
   const runtime = runner(async function* () {
@@ -458,8 +450,7 @@ test("legacy task deadlines are ignored and a two-hour turn can finish normally"
     await core.request({ type: "runtime.check" });
     t.mock.timers.enable({ apis: ["setTimeout", "Date"], now: Date.now() });
     ({ runId } = await core.request({
-      ...requestFor(thread, "execute"),
-      executionConfirmed: true,
+      ...requestFor(thread),
     }));
     await entered.promise;
     assert.deepEqual(runtime.calls[0].settings, retainedSettings);
@@ -970,7 +961,7 @@ test("a v3 workspace preserves custom settings and invalidates shared engine bin
   try {
     assert.equal(
       migratedDb.prepare("PRAGMA user_version").get().user_version,
-      9,
+      10,
     );
     const primaryKey = migratedDb
       .prepare("PRAGMA table_info(agent_threads)")
@@ -1073,4 +1064,75 @@ test("native token usage and compaction survive core restart", async (t) => {
   const reopened = new service.CoreService(dir, () => {}, { runner: runtime });
   assert.deepEqual(reopened.snapshot().snapshot.contexts[0], expected);
   await reopened.close();
+});
+
+test("token activity survives forks, project reset, cache clear, removal and restart", async t => {
+  const runtime = runner(success);
+  const { core, thread, dir } = await setup(t, runtime);
+  await settled(core, (await core.request(requestFor(thread))).runId);
+  const original = core.snapshot().snapshot.tokenActivity;
+  assert.equal(original.length, 1);
+  assert.equal(JSON.parse(original[0].usage).input_tokens, 10);
+  const { thread: fork } = await core.request({ type: "thread.fork", threadId: thread.id });
+  await core.request({ type: "usage.recover" });
+  assert.deepEqual(core.snapshot().snapshot.tokenActivity, original);
+  await core.request({ type: "thread.delete", threadId: fork.id });
+  await core.request({ type: "storage.clear" });
+  const { resetPreview } = await core.request({ type: "project.reset.preview", projectId: thread.projectId });
+  await core.request({ type: "project.reset", projectId: thread.projectId, revision: resetPreview.revision });
+  assert.equal(core.snapshot().snapshot.runs.length, 0);
+  assert.deepEqual(core.snapshot().snapshot.tokenActivity, original);
+  await core.request({ type: "project.remove", projectId: thread.projectId });
+  const { usageBackup } = await core.request({ type: "usage.export" });
+  assert.equal((await core.request({ type: "usage.import", data: usageBackup })).recoveredActivities, 0);
+  await core.close();
+  const reopened = new service.CoreService(dir, () => {}, { runner: runtime });
+  try {
+    assert.deepEqual(reopened.snapshot().snapshot.tokenActivity, original);
+    assert.equal(reopened.snapshot().snapshot.projects.length, 0);
+  } finally { await reopened.close(); }
+});
+
+test("reported partial token activity remains durable when a native task fails", async t => {
+  const runtime = runner(async function* () {
+    yield { type: "thread.started", thread_id: "meter-thread" };
+    yield { type: "turn.started", thread_id: "meter-thread", turn_id: "failed-turn" };
+    yield { type: "usage.updated", usage: { input_tokens: 80, output_tokens: 5 } };
+    yield { type: "usage.updated", usage: { input_tokens: 100, output_tokens: 10 } };
+    throw new Error("fixture engine disconnected");
+  });
+  const { core, thread, dir } = await setup(t, runtime);
+  const { runId } = await core.request(requestFor(thread));
+  const snapshot = await settled(core, runId);
+  assert.equal(snapshot.runs[0].status, "failed");
+  assert.equal(snapshot.runs[0].usage, null);
+  assert.equal(snapshot.tokenActivity.length, 1);
+  assert.equal(snapshot.tokenActivity[0].source, "native");
+  assert.equal(JSON.parse(snapshot.tokenActivity[0].usage).input_tokens, 100);
+  assert.ok(snapshot.tokenActivity[0].finishedAt);
+  await core.request({ type: "thread.delete", threadId: thread.id });
+  await core.close();
+  const reopened = new service.CoreService(dir, () => {}, { runner: runtime });
+  try { assert.deepEqual(reopened.snapshot().snapshot.tokenActivity, snapshot.tokenActivity); }
+  finally { await reopened.close(); }
+});
+
+test("portable legacy project usage is migrated without creating a mirror conflict", async t => {
+  const { core, thread, dir } = await setup(t, runner(success));
+  await settled(core, (await core.request(requestFor(thread))).runId);
+  const project = core.snapshot().snapshot.projects.find(p => p.id === thread.projectId);
+  await core.close();
+  const filename = path.join(project.root, ".nexiom", "project.json");
+  const record = JSON.parse(await readFile(filename, "utf8"));
+  for (const run of record.records.agentRuns) delete run.activityId;
+  await writeFile(filename, JSON.stringify(record));
+  const moved = path.join(dir, "moved-legacy-project");
+  await rename(project.root, moved);
+  const reopened = new service.CoreService(dir, () => {}, { runner: runner(success) });
+  try {
+    const restored = await reopened.openProject(moved);
+    assert.equal(restored.snapshot.tokenActivity.length, 1);
+    assert.equal(restored.snapshot.projects.length, 1);
+    assert.equal(restored.project.root, moved);
+  } finally { await reopened.close(); }
 });

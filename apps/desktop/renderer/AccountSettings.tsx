@@ -8,13 +8,16 @@ import {
 } from "react";
 import {
   Check,
+  Download,
+  Upload,
+  RefreshCw,
   ImagePlus,
   LoaderCircle,
   Pencil,
   UserRound,
   X,
 } from "lucide-react";
-import type { AccountProfile, Run } from "../../../packages/contracts";
+import type { AccountProfile, TokenActivity } from "../../../packages/contracts";
 import { request } from "./bridge";
 import { aggregateTokenUsage, localDateKey, tokenRate, usageLevel, type UsageDay } from "./token-usage";
 import "./account.css";
@@ -101,12 +104,14 @@ async function inspectAvatar(file: File): Promise<CropAsset> {
 export function AccountSettings({
   profile,
   runs,
+  usageWarning,
   onSaved,
   onDirtyChange,
   onBusyChange,
 }: {
   profile: AccountProfile;
-  runs: Run[];
+  runs: TokenActivity[];
+  usageWarning?: string;
   onSaved: () => Promise<void>;
   onDirtyChange: (dirty: boolean) => void;
   onBusyChange: (busy: boolean) => void;
@@ -118,6 +123,10 @@ export function AccountSettings({
   const [cropBusy, setCropBusy] = useState(false);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const [usageBusy, setUsageBusy] = useState(false);
+  const [usageMessage, setUsageMessage] = useState("");
+  const [usageError, setUsageError] = useState("");
+  const usageImportRef = useRef<HTMLInputElement>(null);
   const [activityMode, setActivityMode] = useState<ActivityMode>("daily");
   const [cropAsset, setCropAsset] = useState<CropAsset | null>(null);
   const [cropZoom, setCropZoom] = useState(1);
@@ -151,7 +160,7 @@ export function AccountSettings({
   });
   const streaks = useMemo(() => getStreaks(usage.daily), [usage.daily]);
   const longestRun = useMemo(() => runs.reduce((maximum, run) => {
-    if (run.kind === "inspection" || !run.finishedAt) return maximum;
+    if (!run.finishedAt) return maximum;
     const started = new Date(run.createdAt).getTime();
     const finished = new Date(run.finishedAt).getTime();
     if (!Number.isFinite(started) || !Number.isFinite(finished)) return maximum;
@@ -192,7 +201,7 @@ export function AccountSettings({
     return () => window.clearInterval(timer);
   }, []);
   useEffect(() => onDirtyChange(dirty), [dirty, onDirtyChange]);
-  useEffect(() => onBusyChange(busy || cropBusy), [busy, cropBusy, onBusyChange]);
+  useEffect(() => onBusyChange(busy || cropBusy || usageBusy), [busy, cropBusy, usageBusy, onBusyChange]);
   useEffect(() => {
     const current = JSON.stringify(profile);
     if (current === lastProfile.current) return;
@@ -374,6 +383,29 @@ export function AccountSettings({
     ? dayLabel(activeDay)
     : activityLabel(activeDay, activeDayIndex);
 
+  async function manageUsage(action: "export" | "recover" | "import", file?: File) {
+    if (usageBusy) return;
+    setUsageBusy(true); setUsageError(""); setUsageMessage("");
+    try {
+      if (action === "export") {
+        const response = await request({ type: "usage.export" });
+        if (!response.usageBackup) throw new Error("未能生成 Token 活动备份。");
+        const url = URL.createObjectURL(new Blob([response.usageBackup], { type: "application/json" }));
+        const link = document.createElement("a");
+        link.href = url; link.download = `NEXIOM-Token活动-${localDateKey(new Date())}.json`;
+        document.body.appendChild(link); link.click(); link.remove();
+        window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+        setUsageMessage("已导出 Token 活动备份，包含用量和日期，不包含对话或 API Key。");
+      } else {
+        if (action === "import" && (!file || file.size > 16 * 1024 * 1024)) throw new Error("请选择不超过 16 MB 的 Token 活动 JSON 备份。");
+        const response = await request(action === "recover" ? { type: "usage.recover" } : { type: "usage.import", data: await file!.text() });
+        await onSaved();
+        setUsageMessage(response.recoveredActivities ? `已新增或补齐 ${response.recoveredActivities} 条活动记录。` : "未发现可新增或补齐的记录，没有重复添加。");
+      }
+    } catch (failure) { setUsageError((failure as Error).message); }
+    finally { setUsageBusy(false); if (usageImportRef.current) usageImportRef.current.value = ""; }
+  }
+
   return (
     <div className="account-settings">
       <header className="account-page-header">
@@ -395,7 +427,7 @@ export function AccountSettings({
       </section>
 
       <dl className="account-overview" aria-label="账户使用概览">
-        <div><dd>{compactCount.format(usage.totals.totalTokens)}</dd><dt>累计 Token 数</dt></div>
+        <div><dd>{compactCount.format(usage.allTimeTotals.totalTokens)}</dd><dt>累计 Token 数</dt></div>
         <div><dd>{compactCount.format(peakTokens)}</dd><dt>峰值 Token 数</dt></div>
         <div><dd>{formatDuration(longestRun)}</dd><dt>最长任务时长</dt></div>
         <div><dd>{streaks.current} 天</dd><dt>当前连续天数</dt></div>
@@ -403,6 +435,7 @@ export function AccountSettings({
       </dl>
 
       <section className="account-activity">
+        <p className="account-usage-storage">Token 活动独立保存，清缓存、删除对话和重置项目均会保留。下方展示最近一年的活动。</p>
         <div className="account-activity-heading">
           <h2>Token 活动</h2>
           <div className="account-activity-tabs" aria-label="Token 活动聚合方式">
@@ -471,6 +504,15 @@ export function AccountSettings({
           {usage.totals.unknownRuns > 0 && usage.invalidDateRuns > 0 && " · "}
           {usage.invalidDateRuns > 0 && `${usage.invalidDateRuns} 次记录缺少有效日期`}
         </p>}
+        <div className="account-usage-actions">
+          <button className="secondary-button" disabled={usageBusy} onClick={() => void manageUsage("export")}><Download size={15} />导出活动备份</button>
+          <button className="secondary-button" disabled={usageBusy} onClick={() => usageImportRef.current?.click()}><Upload size={15} />导入备份</button>
+          <button className="secondary-button" disabled={usageBusy} onClick={() => void manageUsage("recover")}>{usageBusy ? <LoaderCircle size={15} className="spin" /> : <RefreshCw size={15} />}恢复本地历史</button>
+          <input hidden ref={usageImportRef} type="file" accept=".json,application/json" onChange={event => { const file = event.target.files?.[0]; if (file) void manageUsage("import", file); }} />
+        </div>
+        {usageMessage && <p className="account-usage-storage" role="status">{usageMessage}</p>}
+        {usageWarning && <p className="account-usage-incomplete">{usageWarning}</p>}
+        {usageError && <p className="form-error" role="alert">{usageError}</p>}
       </section>
 
       {editing && (

@@ -104,6 +104,7 @@ export function aggregateTokenUsage(runs: readonly UsageRun[], now = new Date(),
     continuationInputTokens: 0,
     continuationCachedInputTokens: 0,
   };
+  const allTimeTotals = { ...emptyTokens(), knownRuns: 0, unknownRuns: 0 };
   for (const run of runs) {
     if (run.kind !== "agent" || seen.has(run.id)) continue;
     seen.add(run.id);
@@ -112,9 +113,16 @@ export function aggregateTokenUsage(runs: readonly UsageRun[], now = new Date(),
       invalidDateRuns += 1;
       continue;
     }
+    const parsed = parseTokenUsage(run.usage);
+    if (createdAt < new Date(end.getFullYear(), end.getMonth(), end.getDate() + 1)) {
+      if (parsed) {
+        allTimeTotals.knownRuns++;
+        for (const key of Object.keys(parsed) as (keyof TokenUsage)[]) allTimeTotals[key] += parsed[key];
+      } else allTimeTotals.unknownRuns++;
+    }
     const day = byDate.get(localDateKey(createdAt));
     if (!day) continue;
-    const usage = parseTokenUsage(run.usage);
+    const usage = parsed;
     if (!usage) {
       day.unknownRuns += 1;
       continue;
@@ -147,7 +155,7 @@ export function aggregateTokenUsage(runs: readonly UsageRun[], now = new Date(),
     }),
     { ...emptyTokens(), knownRuns: 0, unknownRuns: 0 },
   );
-  return { daily, totals, cache, start, end, invalidDateRuns };
+  return { daily, totals, allTimeTotals, cache, start, end, invalidDateRuns };
 }
 
 export function usageLevel(tokens: number, maximum: number): 0 | 1 | 2 | 3 | 4 {

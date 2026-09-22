@@ -18,8 +18,6 @@ try {
     type: "agent.submit",
     threadId: thread.id,
     text: "这是本地取消任务测试。仅运行一条 Python 命令：import os,pathlib,time; pathlib.Path('cancel-pid.txt').write_text(str(os.getpid())); time.sleep(90)。不要运行其他命令，不要联网、安装依赖或创建其他文件。等待这条命令完成。",
-    mode: "execute",
-    executionConfirmed: true,
     clientRequestId: randomUUID(),
   });
   let pid;

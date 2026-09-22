@@ -8,11 +8,11 @@ async function load(file) {
   return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`);
 }
 const { createReadingTools, readingWebSearchMode } = await load("../packages/runtime/reading-tools.ts");
-const { readingSteps, readingProgressNotice } = await load("../apps/desktop/renderer/reading-progress.ts");
+const { readingSteps, readingProgressNotice, readingCanViewReport } = await load("../apps/desktop/renderer/reading-progress.ts");
 const { readingWorkflowInstructions, readingReportStructure } = await load("../packages/contracts/reading-workflow.ts");
 const { readingProseTables } = await load("../apps/desktop/renderer/reading-prose-tables.ts");
 const { getCurrentAgentTaskKind } = await load("../apps/desktop/renderer/agent-task-state.ts");
-const input = { stageId: "reading", signal: new AbortController().signal, settings: { network: true }, mode: "plan" };
+const input = { stageId: "reading", signal: new AbortController().signal, settings: { network: true } };
 const run = { id: "r1", status: "running" };
 const progress = (sequence, phase, status, stepId = phase) => ({
   id: `call-${sequence}`, runId: "r1", sequence, status: "completed",
@@ -92,6 +92,17 @@ test("waiting and missing-record notices are separate from the action chain", ()
   assert.equal(readingProgressNotice([step("reading", "reading", "completed")], succeeded), "研读已结束，部分阶段记录不完整");
   const complete = readingSteps(phaseSequence(["reading", "analyzing", "thinking", "writing"]), succeeded);
   assert.equal(readingProgressNotice(complete, succeeded), undefined);
+});
+
+test("a live writing completion offers the report without treating the run as finished", () => {
+  const items = phaseSequence(["reading", "analyzing", "thinking", "writing"]);
+  assert.equal(readingCanViewReport(readingSteps(items, run), run), true);
+  assert.equal(readingCanViewReport(readingSteps(phaseSequence(["reading", "analyzing", "thinking"]), run), run), false);
+  assert.equal(readingCanViewReport(readingSteps([progress(1, "writing", "running")], run), run), false);
+  for (const status of ["succeeded", "cancelled", "failed", "interrupted"]) {
+    const ended = { ...run, status };
+    assert.equal(readingCanViewReport(readingSteps(items, ended), ended), false);
+  }
 });
 
 test("a terminated run still reports its outcome when every recorded phase completed", () => {

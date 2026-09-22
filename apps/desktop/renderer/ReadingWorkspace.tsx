@@ -25,6 +25,7 @@ import {
   Send,
   Square,
   Tags,
+  X,
 } from "lucide-react";
 import type { AgentItem, FileContent, Message, ProjectFile, Run } from "../../../packages/contracts";
 import { RichText } from "./AgentOutput";
@@ -32,6 +33,7 @@ import { PdfViewer } from "./PdfViewer";
 import { AgentTaskStatus } from "./AgentTaskStatus";
 import { getCurrentAgentTaskKind } from "./agent-task-state";
 import { ReadingProgress } from "./ReadingProgress";
+import { readingCanViewReport, readingSteps } from "./reading-progress";
 import { WorkspaceLogo } from "./WorkspaceLogo";
 import { readPreference, writePreference } from "./preferences";
 
@@ -84,6 +86,7 @@ interface ReadingWorkspaceProps {
   onStart: () => void;
   onCorrect: (correction: string, target: ReadingCorrectionTarget) => void;
   onImport: (selected: FileList | null) => Promise<void>;
+  onRemove: (file: ProjectFile) => Promise<void>;
   onReadFile: (file: ProjectFile) => Promise<FileContent | undefined>;
   onConfigureModel: () => void;
   onCancel: () => void;
@@ -175,6 +178,17 @@ function latestReport(messages: Message[], items: AgentItem[], afterSequence: nu
   return candidates.at(-1)?.text.trim() ?? "";
 }
 
+export function draftReadingReport(items: AgentItem[], runId: string) {
+  return items
+    .flatMap((record) =>
+      record.runId === runId && record.item.type === "agent_message" && isReadingReport(record.item.text)
+        ? [{ sequence: record.sequence, text: record.item.text.trim() }]
+        : [],
+    )
+    .sort((left, right) => left.sequence - right.sequence)
+    .at(-1)?.text ?? "";
+}
+
 function extractCorrections(messages: Message[], afterSequence: number): ReadingCorrection[] {
   return messages.flatMap((message) => {
     if (
@@ -232,6 +246,7 @@ export function ReadingWorkspace({
   onStart,
   onCorrect,
   onImport,
+  onRemove,
   onReadFile,
   onConfigureModel,
   onCancel,
@@ -240,11 +255,17 @@ export function ReadingWorkspace({
     .filter((message) => message.role === "user" && message.text.startsWith(READING_TASK_MARKER))
     .reduce((latest, message) => Math.max(latest, message.sequence), -1);
   const hasStructuredReading = readingStartSequence >= 0;
+  const [viewingReport, setViewingReport] = useState(false);
   const report = useMemo(
     () => hasStructuredReading ? latestReport(messages, agentItems, readingStartSequence, latestRun?.status !== "succeeded" ? latestRun?.id : undefined) : "",
     [messages, agentItems, hasStructuredReading, readingStartSequence, latestRun],
   );
-  const sections = useMemo(() => parseReadingReport(report), [report]);
+  const draftReport = useMemo(
+    () => activeRun ? draftReadingReport(agentItems, activeRun.id) : "",
+    [agentItems, activeRun],
+  );
+  const shownReport = viewingReport && activeRun ? draftReport || report : report;
+  const sections = useMemo(() => parseReadingReport(shownReport), [shownReport]);
   const corrections = useMemo(
     () => extractCorrections(messages, readingStartSequence),
     [messages, readingStartSequence],
@@ -263,6 +284,7 @@ export function ReadingWorkspace({
   const [animatedRunId, setAnimatedRunId] = useState<string | null>(activeRun?.id ?? null);
   const [progressHistory, setProgressHistory] = useState(false);
   const problemPicker = useRef<HTMLInputElement>(null);
+  const sourceRequest = useRef(0);
   const workspaceGrid = useRef<HTMLDivElement>(null);
   const correctionPanel = useRef<HTMLElement>(null);
   const correctionButton = useRef<HTMLButtonElement>(null);
@@ -296,6 +318,15 @@ export function ReadingWorkspace({
   }, [!!report, !!activeRun, restarting, animatedRunId]);
 
   useEffect(() => {
+    if (activeRun) setViewingReport(false);
+  }, [activeRun?.id]);
+
+  useEffect(() => {
+    if (activeRun || report) return;
+    if (viewingReport) setViewingReport(false);
+  }, [activeRun, viewingReport, report]);
+
+  useEffect(() => {
     if (activeRun) { setAnimatedRunId(activeRun.id); return; }
     if (!animatedRunId) return;
     const completed = latestRun?.id === animatedRunId && latestRun.status === "succeeded";
@@ -311,6 +342,21 @@ export function ReadingWorkspace({
     if (!sections.some((section) => section.id === activeSection)) setActiveSection(sections[0].id);
   }, [sections, activeSection]);
 
+
+  useEffect(() => {
+    const paths = new Set(files.map(file => file.path));
+    setPdfContents(current => {
+      const entries = Object.entries(current);
+      return entries.some(([path]) => !paths.has(path))
+        ? Object.fromEntries(entries.filter(([path]) => paths.has(path))) : current;
+    });
+    if (sourcePath && !paths.has(sourcePath)) {
+      sourceRequest.current++;
+      setSourcePath("");
+      setSourceLoading("");
+      setSourceError("");
+    }
+  }, [files, sourcePath]);
 
   const start = (event: FormEvent) => {
     event.preventDefault();
@@ -329,19 +375,22 @@ export function ReadingWorkspace({
   };
 
   const openSource = async (file: ProjectFile) => {
+    const requestId = ++sourceRequest.current;
     setSourcePath(file.path);
     setSourceError("");
+    setSourceLoading("");
     if (pdfContents[file.path]) return;
     setSourceLoading(file.path);
     try {
       const content = await onReadFile(file);
+      if (requestId !== sourceRequest.current) return;
       if (!content) throw new Error("无法读取原题文件。");
       if (content.mime !== "application/pdf" || !content.base64) throw new Error("当前文件无法作为 PDF 显示。");
       setPdfContents((current) => ({ ...current, [file.path]: content.base64! }));
     } catch (failure) {
-      setSourceError(failure instanceof Error ? failure.message : "无法打开原题文件。");
+      if (requestId === sourceRequest.current) setSourceError(failure instanceof Error ? failure.message : "无法打开原题文件。");
     } finally {
-      setSourceLoading("");
+      if (requestId === sourceRequest.current) setSourceLoading("");
     }
   };
 
@@ -452,6 +501,14 @@ export function ReadingWorkspace({
                       title={file.path}
                     >
                       <FileText size={17} /><span>{file.name}</span>
+                      <button
+                        type="button"
+                        className="reading-intake-remove"
+                        title={`移除 ${file.name}`}
+                        aria-label={`移除 ${file.name}`}
+                        disabled={busy || !!activeRun}
+                        onClick={() => void onRemove(file)}
+                      ><X size={16} aria-hidden="true" /></button>
                     </div>
                   ))}
                 </div>
@@ -480,9 +537,19 @@ export function ReadingWorkspace({
     );
   }
 
-  if (activeRun) return <ReadingProgress key={activeRun.id} run={activeRun} items={agentItems} onCancel={onCancel} />;
-  if (latestRun?.id === animatedRunId && latestRun.status === "succeeded" && report) {
+  const canViewReport = !!activeRun && readingCanViewReport(readingSteps(agentItems, activeRun), activeRun);
+  if (activeRun && !viewingReport) return <ReadingProgress key={activeRun.id} run={activeRun} items={agentItems} onCancel={onCancel} onViewReport={canViewReport ? () => setViewingReport(true) : undefined} />;
+  if (!viewingReport && latestRun?.id === animatedRunId && latestRun.status === "succeeded" && report) {
     return <ReadingProgress key={latestRun.id} run={latestRun} items={agentItems} onCancel={onCancel} />;
+  }
+  if (viewingReport && activeRun && !shownReport) {
+    return <section className="reading-report-pending" aria-live="polite">
+      <p>报告仍在写入。</p>
+      <div>
+        <button type="button" className="secondary-button" onClick={() => setViewingReport(false)}><ArrowLeft size={15} />返回进度</button>
+        <button type="button" className="reading-progress-stop" onClick={onCancel} aria-label="停止研读"><Square size={15} /></button>
+      </div>
+    </section>;
   }
 
   return (
@@ -501,7 +568,8 @@ export function ReadingWorkspace({
         </div>
         <div className="reading-report-actions">
           {runOutcome && <AgentTaskStatus kind={currentTaskKind} status={runOutcome} compact final />}
-          {latestRun && <button type="button" className="secondary-button" onClick={() => setProgressHistory(true)}><History size={15} />研读过程</button>}
+          {activeRun && <button type="button" className="secondary-button" onClick={() => setViewingReport(false)}><ArrowLeft size={15} />返回进度</button>}
+          {!activeRun && latestRun && <button type="button" className="secondary-button" onClick={() => setProgressHistory(true)}><History size={15} />研读过程</button>}
           <button
             type="button"
             className="secondary-button"

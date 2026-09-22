@@ -28,7 +28,7 @@ export function AgentActivity({
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
   }, [run.id, run.createdAt, run.finishedAt, run.status]);
-  const kind = casual ? "thinking" : getCurrentAgentTaskKind(items, run.id, run.mode === "plan" ? "planning" : "thinking");
+  const kind = casual ? "thinking" : getCurrentAgentTaskKind(items, run.id, "thinking");
   const status = run.status === "succeeded" ? "completed" : run.status;
   return (
     <div className="working-indicator" role="status">

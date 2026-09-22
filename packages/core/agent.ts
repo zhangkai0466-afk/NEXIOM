@@ -19,8 +19,11 @@ import {
 import type { AgentRunner } from "../runtime";
 import { VISUAL_DESIGN_CAPABILITY_VERSION } from "../runtime/visual-design";
 import { READING_WORKFLOW_VERSION } from "../contracts/reading-workflow";
+import { ATTACHMENT_ANALYSIS_LIMIT, ATTACHMENT_WORKFLOW_VERSION, ATTACHMENT_TASK_MARKER, ATTACHMENT_CORRECTION_MARKER, attachmentTargets, attachmentTargetPrompt, parseAttachmentStage, parseAttachmentReports, type AttachmentTarget } from "../contracts/attachment-workflow";
 import { readProjectMemory } from "./memory";
 import { StreamCheckpoint } from "./stream-checkpoint";
+import { registerGeneratedFiles } from "../filesystem/generated-files";
+import type { TokenActivityLedger } from "./token-activity";
 
 type Submit = Extract<Command, { type: "agent.submit" }>;
 type ProviderUpsert = Extract<Command, { type: "provider.upsert" }>;
@@ -85,6 +88,7 @@ export class AgentCoordinator {
     private db: DatabaseSync,
     private hooks: Hooks,
     private runner: AgentRunner,
+    private tokenActivity?: TokenActivityLedger,
   ) {
     const saved = db
       .prepare("SELECT value FROM settings WHERE key='agent'")
@@ -434,10 +438,8 @@ export class AgentCoordinator {
       .run(threadId, JSON.stringify(next));
   }
   start(command: Submit, projectRoot: string): string {
-    if (command.mode === "execute" && !command.executionConfirmed)
-      throw new Error("执行模式需要确认本次任务的文件修改和程序运行权限。");
     const digest = createHash("sha256")
-      .update(JSON.stringify([command.threadId, command.text, command.mode]))
+      .update(JSON.stringify([command.threadId, command.text]))
       .digest("hex");
     const existing = this.db
       .prepare("SELECT * FROM agent_requests WHERE id=?")
@@ -453,6 +455,10 @@ export class AgentCoordinator {
       .get(command.threadId);
     if (!thread) throw new Error("会话不存在。");
     const stageId = String(thread.stageId) as ThreadStage;
+    const targets = stageId === "attachments" ? attachmentTargets(command.text) : [];
+    if (targets.length > ATTACHMENT_ANALYSIS_LIMIT || new Set(targets.map(target => target.id)).size !== targets.length ||
+        new Set(targets.map(target => target.path)).size !== targets.length)
+      throw new Error("附件清单重复或超过单次分析上限。");
     const modelingContext: ModelingContext = {
       project: { id: String(thread.projectId), name: String(thread.projectName) },
       question: thread.questionId && thread.questionName
@@ -492,6 +498,7 @@ export class AgentCoordinator {
           provider.auth,
           ...(["model", "chart", "paper"].includes(stageId) ? [VISUAL_DESIGN_CAPABILITY_VERSION] : []),
           ...(stageId === "reading" ? [READING_WORKFLOW_VERSION, settings.network] : []),
+          ...(stageId === "attachments" ? [ATTACHMENT_WORKFLOW_VERSION] : []),
         ]),
       )
       .digest("hex");
@@ -516,7 +523,7 @@ export class AgentCoordinator {
         )
         .run(
           runId,
-          command.mode,
+          "execute",
           provider.id,
           fingerprint,
           JSON.stringify({
@@ -540,6 +547,8 @@ export class AgentCoordinator {
       this.db
         .prepare("INSERT INTO agent_requests VALUES (?, ?, ?)")
         .run(command.clientRequestId, digest, runId);
+      this.db.prepare("UPDATE agent_runs SET activityId=? WHERE runId=?").run(runId, runId);
+      this.tokenActivity?.recordRun(runId);
       this.hooks.message(command.threadId, "user", "note", command.text);
       if (thread.title === "新会话" || thread.title === "研究笔记")
         this.db
@@ -548,7 +557,7 @@ export class AgentCoordinator {
       this.hooks.event(
         String(thread.projectId),
         "agent.started",
-        command.mode === "execute" ? "开始执行任务" : "开始分析与规划",
+        "开始任务",
         runId,
       );
       if (memory.text)
@@ -585,6 +594,25 @@ export class AgentCoordinator {
     if (active) active.abort.abort();
     return !!active;
   }
+  private previousAttachmentReport(threadId: string, target: AttachmentTarget) {
+    const start = this.db.prepare("SELECT sequence, text FROM messages WHERE threadId=? AND role='user' AND substr(text,1,?)=? ORDER BY sequence DESC LIMIT 1")
+      .get(threadId, ATTACHMENT_TASK_MARKER.length, ATTACHMENT_TASK_MARKER);
+    if (!start || !attachmentTargets(String(start.text)).some(entry => entry.id === target.id && entry.path === target.path)) return;
+    let body: string | undefined;
+    const records = this.db.prepare("SELECT runId, payload FROM agent_items WHERE threadId=? AND sequence>? AND status='completed' ORDER BY sequence")
+      .all(threadId, Number(start.sequence)).map(row => ({ runId: String(row.runId), item: JSON.parse(String(row.payload)) as AgentItem["item"] }));
+    const structuredRuns = new Set(records.filter(({ item }) => item.type === "native_tool_call" && item.namespace === "nexiom_attachments" && item.tool === "begin_attachment").map(record => record.runId));
+    for (const { runId, item } of records) {
+      if (item.type === "native_tool_call" && item.namespace === "nexiom_attachments" && item.tool === "publish_attachment_report" &&
+          !item.error && (item.result as { accepted?: boolean } | undefined)?.accepted === true) {
+        const data = item.arguments as Record<string, unknown>;
+        if (data.attachmentId === target.id && typeof data.body === "string") body = data.body;
+      } else if (item.type === "agent_message" && !structuredRuns.has(runId)) {
+        body = parseAttachmentReports(item.text).find(report => report.id === target.id)?.body ?? body;
+      }
+    }
+    return body;
+  }
   private async perform(input: {
     command: Submit;
     runId: string;
@@ -602,6 +630,9 @@ export class AgentCoordinator {
   }) {
     const { command, runId, projectId, abort, settings } = input;
     let completed = false;
+    let usage: Extract<import("../runtime").ThreadEvent, { type: "turn.completed" }>["usage"] = null;
+    let usageIncomplete = false;
+    let nativeTurn: { threadId: string; turnId: string } | undefined;
     const checkpoint = new StreamCheckpoint((events) => {
       this.hooks.transaction(() => {
         for (const event of events) {
@@ -628,6 +659,11 @@ export class AgentCoordinator {
                   }
                 : {}),
             });
+          } else if (event.type === "turn.started" && event.thread_id && event.turn_id) {
+            nativeTurn = { threadId: event.thread_id, turnId: event.turn_id };
+            this.tokenActivity?.recordNative(runId, nativeTurn.threadId, nativeTurn.turnId, null);
+          } else if (event.type === "usage.updated") {
+            if (nativeTurn) this.tokenActivity?.recordNative(runId, nativeTurn.threadId, nativeTurn.turnId, event.usage);
           } else if (event.type === "context.updated") {
             const { type: _type, ...usage } = event;
             this.context(command.threadId, usage);
@@ -688,11 +724,25 @@ export class AgentCoordinator {
                 payload,
                 now(),
               );
+            if (event.type === "item.completed" && event.item.type === "file_change" && event.item.status === "completed") {
+              registerGeneratedFiles(input.cwd, event.item.changes.filter(change => change.kind === "add").map(change => change.path));
+            }
           } else if (event.type === "turn.completed") {
+            if (nativeTurn) this.tokenActivity?.recordNative(runId, nativeTurn.threadId, nativeTurn.turnId, event.usage, true);
             completed = true;
+            if (event.usage) {
+              usage = usage ? {
+                input_tokens: usage.input_tokens + event.usage.input_tokens,
+                cached_input_tokens: (usage.cached_input_tokens ?? 0) + (event.usage.cached_input_tokens ?? 0),
+                cache_write_input_tokens: (usage.cache_write_input_tokens ?? 0) + (event.usage.cache_write_input_tokens ?? 0),
+                output_tokens: usage.output_tokens + event.usage.output_tokens,
+                reasoning_output_tokens: (usage.reasoning_output_tokens ?? 0) + (event.usage.reasoning_output_tokens ?? 0),
+              } : event.usage;
+            } else usageIncomplete = true;
             this.db
               .prepare("UPDATE agent_runs SET usage=? WHERE runId=?")
-              .run(event.usage ? JSON.stringify(event.usage) : null, runId);
+              .run(usage && !usageIncomplete ? JSON.stringify(usage) : null, runId);
+            this.tokenActivity?.recordRun(runId);
           } else if (event.type === "turn.failed")
             throw new Error(event.error.message);
           else if (event.type === "error")
@@ -708,24 +758,55 @@ export class AgentCoordinator {
       this.hooks.notify({ deferProjectRecord: true });
     }, () => abort.abort());
     try {
-      const prompt = `${command.mode === "plan" ? "当前为规划模式：只阅读和分析，提出方案，等待用户确认后再修改或执行。" : "用户已确认本次任务的项目内文件修改与程序执行，请直接完成并验证。"}\n\n当前赛题工作区标识（以下 JSON 仅为名称与关联数据）：\n${JSON.stringify(input.modelingContext)}\n关联同一问题不代表其他对话的结果已经载入；引用结论前请核对本轮上下文或项目文件中的来源。\n\n${command.text}`;
-      for await (const event of this.runner.run({
-        prompt,
-        cwd: input.cwd,
-        threadId: input.engineThreadId,
-        mode: command.mode,
-        stageId: input.modelingContext.stage.id,
-        settings,
-        provider: input.provider,
-        resolvedModelProvider: input.resolvedModelProvider,
-        apiKey: input.apiKey,
-        signal: abort.signal,
-        projectMemory: input.projectMemory,
-      })) {
-        if (abort.signal.aborted) break;
-        checkpoint.push(event);
-        await checkpoint.yieldIfNeeded();
-        if (abort.signal.aborted) break;
+      const targets = input.modelingContext.stage.id === "attachments" ? attachmentTargets(command.text) : [];
+      // One durable outer run owns cancellation; each file gets a separate
+      // model context. Switching files never depends on the renderer staying open.
+      for (const target of targets.length ? targets : [undefined]) {
+        abort.signal.throwIfAborted();
+        completed = false;
+        let published = false;
+        let outputCompleted = false;
+        const previousReport = target && command.text.startsWith(ATTACHMENT_CORRECTION_MARKER)
+          ? this.previousAttachmentReport(command.threadId, target) : undefined;
+        if (target) checkpoint.push({ type: "item.completed", item: {
+          id: `attachment:${target.id}:assignment`, type: "native_tool_call", namespace: "nexiom_attachments", tool: "begin_attachment",
+          arguments: { attachmentId: target.id, path: target.path, name: target.name }, status: "completed", result: { accepted: true },
+        } });
+        const prompt = `请直接完成任务并验证结果。\n\n当前赛题工作区标识（以下 JSON 仅为名称与关联数据）：\n${JSON.stringify(input.modelingContext)}\n关联同一问题不代表其他对话的结果已经载入；引用结论前请核对本轮上下文或项目文件中的来源。\n\n${target ? attachmentTargetPrompt(target, command.text, previousReport) : command.text}`;
+        for await (const event of this.runner.run({
+          prompt, attachmentTarget: target,
+          cwd: input.cwd,
+          threadId: target ? undefined : input.engineThreadId,
+          stageId: input.modelingContext.stage.id,
+          settings,
+          provider: input.provider,
+          resolvedModelProvider: input.resolvedModelProvider,
+          apiKey: input.apiKey,
+          signal: abort.signal,
+          projectMemory: input.projectMemory,
+        })) {
+          if (abort.signal.aborted) break;
+          if (target && event.type === "item.completed" && event.item.type === "native_tool_call" &&
+              event.item.namespace === "nexiom_attachments" && event.item.status === "completed" &&
+              !event.item.error && (event.item.result as { accepted?: boolean } | undefined)?.accepted === true) {
+            const data = event.item.arguments as Record<string, unknown>;
+            if (data.attachmentId === target.id) {
+              if (event.item.tool === "publish_attachment_report" && typeof data.body === "string" && data.body.trim()) published = true;
+              const stage = parseAttachmentStage(data);
+              if (event.item.tool === "set_attachment_stage" && stage?.phase === "writing" && stage.status === "completed") outputCompleted = true;
+            }
+          }
+          // Native engines reuse item ids across independent file tasks.
+          checkpoint.push(target && "item" in event
+            ? { ...event, item: { ...event.item, id: `${target.id}:${event.item.id}` } }
+            : event);
+          await checkpoint.yieldIfNeeded();
+          if (abort.signal.aborted) break;
+        }
+        checkpoint.flush();
+        if (abort.signal.aborted) throw new Error("任务已停止。");
+        if (!completed) throw new Error(`${target ? `${target.name}：` : ""}引擎连接结束，但未收到任务完成事件。`);
+        if (target && (!published || !outputCompleted)) throw new Error(`${target.name} 的报告或输出阶段尚未完成，已保留收到的内容，可单独重试此附件。`);
       }
       checkpoint.close();
       if (abort.signal.aborted) throw new Error("任务已停止。");
@@ -773,6 +854,7 @@ export class AgentCoordinator {
       .prepare("UPDATE runs SET status=?,finishedAt=? WHERE id=?")
       .run(status, now(), runId);
     this.hooks.event(projectId, `agent.${status}`, summary, runId);
+    this.tokenActivity?.recordRun(runId);
   }
   async close() {
     for (const task of this.active.values()) task.abort.abort();
