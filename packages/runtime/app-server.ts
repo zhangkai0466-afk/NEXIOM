@@ -351,7 +351,7 @@ function mapItem(raw: RecordValue): ThreadItem | undefined {
   }
 }
 
-// Reasoning content stays inside the engine. Reading may retain only its lifecycle.
+// Reasoning content stays inside the engine. Every chat keeps only the thinking lifecycle.
 export class AppServerEvents {
   private items = new Map<string, ThreadItem>();
   private compacted = new Set<string>();
@@ -363,7 +363,6 @@ export class AppServerEvents {
   constructor(
     private turnId = "",
     freshThread = true,
-    private readingActivity = false,
   ) {
     this.baseline = freshThread ? readUsage({}) : null;
   }
@@ -390,10 +389,11 @@ export class AppServerEvents {
     if (method === "item/started" || method === "item/completed") {
       const raw = object(params.item);
       if (raw.type === "reasoning") {
-        if (!this.readingActivity || !string(raw.id)) return [];
+        const id = string(raw.id);
+        if (!id) return [];
         return [{
           type: method === "item/started" ? "item.started" : "item.completed",
-          item: { id: `activity:${string(raw.id)}`, type: "agent_activity", phase: "thinking" },
+          item: { id: `activity:${id}`, type: "agent_activity", phase: "thinking" },
         }];
       }
       if (raw.type === "contextCompaction") {
@@ -600,7 +600,7 @@ export async function* runAppServer(options: {
     if (!turnId) throw new Error("Codex 未返回任务标识。");
     activeTurnId = turnId;
     yield { type: "turn.started", thread_id: threadId, turn_id: turnId };
-    const adapter = new AppServerEvents(turnId, !input.threadId, input.stageId === "reading");
+    const adapter = new AppServerEvents(turnId, !input.threadId);
     for await (const event of connection.notifications()) {
       input.signal.throwIfAborted();
       if (event.params.threadId && event.params.threadId !== threadId) continue;

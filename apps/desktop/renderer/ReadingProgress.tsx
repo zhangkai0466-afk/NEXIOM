@@ -1,5 +1,5 @@
 import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowDown, ArrowLeft, Circle, Square } from "lucide-react";
+import { ArrowDown, ArrowLeft, Square } from "lucide-react";
 import { motion } from "motion/react";
 import type { AgentItem, Run } from "../../../packages/contracts";
 import { AgentTaskIcon, AgentTaskLabel } from "./AgentTaskStatus";
@@ -17,15 +17,10 @@ const ReadingAction = memo(function ReadingAction({ id, kind, status, arrivalDel
   return <li className="reading-progress-step" data-step-id={id} style={{ "--reading-arrival-delay": `${delay}ms` } as CSSProperties}>
     <span className="reading-progress-link" aria-hidden="true" />
     <div className="reading-progress-action" data-task-status={status}>
-      {status === "pending" ? <>
-        <Circle className="reading-progress-pending-icon" size={28} strokeWidth={1.5} aria-hidden="true" />
-        <span className="reading-progress-pending-label">待{action}</span>
-      </> : <>
-        <AgentTaskIcon kind={kind} status={status} size={32} final={final} />
-        <AgentTaskLabel kind={kind} status={status}>
-          {status === "running" ? `${action}中` : `${action}${ending[status]}`}
-        </AgentTaskLabel>
-      </>}
+      <AgentTaskIcon kind={kind} status={status} size={32} final={final} />
+      <AgentTaskLabel kind={kind} status={status}>
+        {status === "running" ? `${action}中` : `${action}${ending[status]}`}
+      </AgentTaskLabel>
     </div>
   </li>;
 });

@@ -2,7 +2,7 @@ import type { AgentItem, Run } from "../../../packages/contracts";
 import { nextReadingPhases, parseReadingProgress, type ReadingProgress } from "../../../packages/contracts/reading-workflow";
 import { getAgentItemOutcome, type AgentTaskKind, type AgentTaskOutcome } from "./agent-task-state";
 
-export interface ReadingStep { id: string; kind: AgentTaskKind; status: AgentTaskOutcome | "pending" }
+export interface ReadingStep { id: string; kind: AgentTaskKind; status: AgentTaskOutcome }
 
 // Work objectives, not individual calls. Retries and revisits update these
 // bounded slots; the complete event history remains in the run.
@@ -46,10 +46,9 @@ export function readingSteps(items: AgentItem[], run: Run): ReadingStep[] {
     else slot = searched ? "verification" : "review";
     if (stage.phase === "reading") readingStarted = true;
 
-    // Another search invalidates the previous pass's final review. Keep its
-    // place without a green check until this pass reports its own review.
-    if (slot === "searching" && visible.has("verification"))
-      visible.set("verification", { ...visible.get("verification")!, status: "pending" });
+    // A new search is the current action. Hide the previous review until this
+    // pass reports its own thinking; do not invent a pending step.
+    if (slot === "searching") visible.delete("verification");
     visible.set(slot, { id: `${slot}:${run.id}`, kind: stage.phase, status: stage.status });
     if (stage.status === "running") break;
     if (stage.status === "completed") completed.push(stage);
@@ -75,7 +74,7 @@ export function readingSteps(items: AgentItem[], run: Run): ReadingStep[] {
   const result = slots.flatMap(slot => visible.has(slot) ? [visible.get(slot)!] : []);
   if (run.status !== "running") {
     for (const step of result) {
-      if (step.status === "running" || step.status === "pending")
+      if (step.status === "running")
         step.status = run.status === "succeeded" ? "interrupted" : run.status;
     }
   }
@@ -98,4 +97,14 @@ export function readingProgressNotice(steps: ReadingStep[], run: Run): string | 
   // separate waiting phase. The next real action connects to the same chain.
   if (run.status === "succeeded" && (steps.at(-1)?.kind !== "writing" || steps.some(step => step.status !== "completed")))
     return "研读已结束，部分阶段记录不完整";
+}
+
+export function latestFormalReadingRun<T extends { id: string; createdAt: string }>(runs: T[], items: AgentItem[]): T | undefined {
+  const formalIds = new Set(items.flatMap(record => {
+    const item = record.item;
+    return item.type === "native_tool_call" && item.namespace === "nexiom_reading" && item.tool === "set_reading_stage" && getAgentItemOutcome(record) === "completed"
+      ? [record.runId]
+      : [];
+  }));
+  return [...runs].sort((left, right) => left.createdAt.localeCompare(right.createdAt)).reverse().find(run => formalIds.has(run.id));
 }

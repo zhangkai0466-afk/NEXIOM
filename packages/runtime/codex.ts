@@ -8,7 +8,7 @@ import { runAppServer } from "./app-server";
 import { createVisualDesignTools, visualDesignInstructions } from "./visual-design";
 import { supportsVisualWorkspace } from "./visual-workspace-tools";
 import { createReadingTools, readingWebSearchMode } from "./reading-tools";
-import { readingWorkflowInstructions } from "../contracts/reading-workflow";
+import { readingDeveloperInstructions } from "../contracts/reading-workflow";
 import { createAttachmentTools } from "./attachment-tools";
 import { attachmentWorkflowInstructions } from "../contracts/attachment-workflow";
 export { getVisualDesignRuntimeStatus, createVisualDesignTools, resolveVisualDesignBundle } from "./visual-design";
@@ -355,7 +355,7 @@ export class CodexRuntime implements AgentRunner {
     const developerInstructions =
       (supportsVisualWorkspace(input.stageId) ? visualDesignInstructions : "") +
       (input.attachmentTarget ? `\n\n${attachmentWorkflowInstructions}` : "") +
-      (input.stageId === "reading" ? `\n\n${readingWorkflowInstructions}\n文献联网检索：${input.settings.network ? "已允许，使用 web_search 实际检索并核对原文。如果供应商不支持或检索失败，报告限制，不伪造结果。" : "未允许。不得绕过联网设置；将需要的来源和查询词列为待核对，不得声称已完成文献核验。"}` : "") +
+      (input.stageId === "reading" ? readingDeveloperInstructions(input.prompt, input.settings.network) : "") +
       (input.stageId === "model" ? "\n\n建模阶段用户提出的是想法分享与共同讨论。评估其依据、适用条件和取舍；不要将所有人类建议称为人工纠偏，不要未经讨论就改写已确认的题意口径。" : "") +
       (input.projectMemory
         ? `\n\n以下是用户维护的项目记忆，作为当前任务背景；与本轮用户要求冲突时以本轮要求为准。不要自动修改此文档。\n<project_memory>\n${input.projectMemory}\n</project_memory>`

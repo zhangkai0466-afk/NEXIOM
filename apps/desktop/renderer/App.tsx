@@ -47,6 +47,7 @@ import type {
   Thread,
   ConversationStage,
   Command,
+  AgentItem,
 } from "../../../packages/contracts";
 import { applyDesktopUpdate, request, subscribe } from "./bridge";
 import { createSnapshotRefresh, type SnapshotRefresh, type RefreshFailure } from "./snapshot-refresh";
@@ -58,6 +59,7 @@ import { ProjectResetPanel } from "./ProjectResetPanel";
 import { readPreference, removePreference, writePreference } from "./preferences";
 import { ModelingSidebar, dimensionName, isThreadStage, projectDisplayName, readProjectSelection, type Dimension } from "./ModelingSidebar";
 import { AgentActivity } from "./AgentActivity";
+import { getAgentItemOutcome, outputBlockedByThinking } from "./agent-task-state";
 import { PdfViewer } from "./PdfViewer";
 import { ChromeMenuBar } from "./ChromeMenuBar";
 import { VisualDesignWorkspace } from "./VisualDesignWorkspace";
@@ -66,7 +68,6 @@ import { NexiomMark } from "./NexiomMark";
 import { VisualizationIcon } from "./VisualizationIcon";
 import {
   ReadingWorkspace,
-  READING_CORRECTION_MARKER,
   READING_TASK_MARKER,
   type ReadingCorrectionTarget,
 } from "./ReadingWorkspace";
@@ -76,7 +77,7 @@ import {
   type AttachmentCorrectionTarget,
 } from "./AttachmentWorkspace";
 import { MotionConfig } from "motion/react";
-import { readingReportStructure } from "../../../packages/contracts/reading-workflow";
+import { buildReadingDiscussionPrompt, readingReportStructure } from "../../../packages/contracts/reading-workflow";
 import { buildAttachmentTaskPrompt, buildAttachmentCorrectionPrompt } from "../../../packages/contracts/attachment-workflow";
 import logo from "../../../assets/brand/nexiom-desktop-icon-1024.png";
 
@@ -179,23 +180,6 @@ ${materials}
 【研读要求】
 ${readingReportStructure}`;
 }
-
-function buildReadingCorrectionPrompt(correction: string, target: ReadingCorrectionTarget) {
-  return `${READING_CORRECTION_MARKER}
-
-【目标板块】
-ID: ${target.id.replace(/[\r\n]/g, " ")}
-标题: ${target.title.replace(/[\r\n]/g, " ")}
-
-【人工纠偏】
-${correction}
-
-【更新要求】
-这条纠偏只直接归属于“${target.title.replace(/[\r\n]/g, " ")}”板块。先核对材料并修正该板块，再检查依赖关系、陷阱、待核对项及其他问题的连带影响。若与原文冲突，要明确指出。沿用研读阶段顺序，重新输出完整报告；旧报告中的可行路线、建模建议必须删除，长篇表格解释改为正文。其余不受影响的事实保持原意。
-
-${readingReportStructure}`;
-}
-
 
 function IconButton({
   label,
@@ -437,9 +421,32 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
     })),
     ...toolEvents.map((event) => ({ type: "event" as const, value: event })),
     ...agentItems
-      .filter((item) => item.item.type !== "reasoning" && item.item.type !== "agent_activity")
+      .filter((item) => item.item.type !== "reasoning" && item.item.type !== "agent_activity" && !outputBlockedByThinking(agentItems, item))
       .map((item) => ({ type: "agent" as const, value: item })),
   ].sort((a, b) => a.value.sequence - b.value.sequence);
+  const answerHeader = (record: AgentItem) => {
+    if (record.item.type !== "agent_message") return;
+    const run = threadRuns.find((item) => item.id === record.runId);
+    if (!run || run.kind === "inspection") return;
+    const latest = agentItems.reduce<AgentItem | undefined>((chosen, item) =>
+      item.runId === run.id && item.item.type === "agent_message" && !outputBlockedByThinking(agentItems, item) && (!chosen || item.sequence > chosen.sequence) ? item : chosen, undefined);
+    if (latest?.id !== record.id) return;
+    const streaming = run.status === "running" && getAgentItemOutcome(record) === "running";
+    return (
+      <AgentActivity
+        run={run}
+        items={agentItems}
+        paused={appearance.reduceMotion}
+        casual={casualMode}
+        kind={streaming ? "writing" : undefined}
+        settled={!streaming}
+        ruled
+      />
+    );
+  };
+  const waitingRun = latestThreadRun && latestThreadRun.kind !== "inspection" && !timeline.some((item) =>
+    item.type === "agent" && item.value.runId === latestThreadRun.id && item.value.item.type === "agent_message",
+  ) ? latestThreadRun : undefined;
 
   const applySnapshot = useCallback((next: Snapshot) => {
     hasSnapshot.current = true;
@@ -983,7 +990,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
     }
     submitAgent({
       threadId: thread.id,
-      text: buildReadingCorrectionPrompt(correction, target),
+      text: buildReadingDiscussionPrompt(correction, target),
       clientRequestId: crypto.randomUUID(),
     });
   };
@@ -1468,6 +1475,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
                 files={files}
                 activeRun={activeRun?.threadId === threadId ? activeRun : undefined}
                 latestRun={latestThreadRun}
+                runs={threadRuns}
                 busy={busy || !!activeRun}
                 modelReady={!needsModelSetup && snapshot.runtime.connected}
                 onStart={startReading}
@@ -1519,6 +1527,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
                       record={item.value}
                       openFile={openAgentFile}
                       showProgress={!casualMode}
+                      activity={item.type === "agent" ? answerHeader(item.value) : undefined}
                     />
                   ) : item.type === "event" ? (
                     <EventRow key={item.value.id} event={item.value} />
@@ -1554,12 +1563,13 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
                     </article>
                   ),
                 )}
-                {latestThreadRun && latestThreadRun.kind !== "inspection" && (
+                {waitingRun && (
                   <AgentActivity
-                    run={latestThreadRun}
+                    run={waitingRun}
                     items={agentItems}
                     paused={appearance.reduceMotion}
                     casual={casualMode}
+                    settled={waitingRun.status !== "running"}
                   />
                 )}
                 <div ref={endRef} />

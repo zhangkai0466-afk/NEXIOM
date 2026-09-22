@@ -1,6 +1,6 @@
 import { DatabaseSync } from "node:sqlite";
 import { randomUUID } from "node:crypto";
-import { lstatSync, mkdirSync, renameSync } from "node:fs";
+import { cpSync, existsSync, lstatSync, mkdirSync, realpathSync, renameSync } from "node:fs";
 import {
   readdir,
   lstat,
@@ -37,6 +37,13 @@ import { checkedFile, checkedRoot } from "../filesystem/safe-files";
 import { cleanStorage, coreCacheLocations } from "./storage-cleanup";
 import { previewProjectReset, recoverProjectResets, resetProject } from "./project-reset";
 import { TokenActivityLedger } from "./token-activity";
+import {
+  CASUAL_PROJECT_NAME,
+  assertWorkspaceDrive,
+  casualWorkspaceRoot,
+  isSystemDrivePath,
+  workspaceDriveEnforced,
+} from "./workspace-location";
 import {
   importProjectRecord,
   readProjectRecord,
@@ -292,6 +299,7 @@ export class CoreService {
           .run();
       });
       this.tokenActivity.recover();
+      this.relocateCasualWorkspace();
       for (const row of this.db.prepare("SELECT id FROM projects").all())
         this.projectChanged(String(row.id));
       this.flushProjectRecords();
@@ -369,6 +377,31 @@ export class CoreService {
     if (!project) throw new Error("项目不存在。");
     return project;
   }
+  private relocateCasualWorkspace(): void {
+    if (!workspaceDriveEnforced()) return;
+    const row = this.db.prepare("SELECT * FROM projects WHERE name=?").get(CASUAL_PROJECT_NAME) as unknown as Project | undefined;
+    if (!row || !isSystemDrivePath(row.root)) return;
+    const target = casualWorkspaceRoot();
+    if (isSystemDrivePath(target)) return;
+    mkdirSync(target, { recursive: true });
+    let resolved: string;
+    try {
+      resolved = realpathSync(target);
+    } catch {
+      return;
+    }
+    if (path.resolve(row.root) === resolved) return;
+    const occupied = this.db.prepare("SELECT id FROM projects WHERE root=?").get(resolved) as unknown as { id: string } | undefined;
+    if (occupied && occupied.id !== row.id) return;
+    try {
+      if (existsSync(row.root))
+        cpSync(row.root, resolved, { recursive: true, force: false, errorOnExist: false });
+    } catch {
+      return;
+    }
+    this.db.prepare("UPDATE projects SET root=? WHERE id=?").run(resolved, row.id);
+  }
+
   private async projectWorkspace(id: string): Promise<Project> {
     const project = this.project(id);
     const configuredRoot = path.resolve(project.root);
@@ -394,6 +427,7 @@ export class CoreService {
       throw new Error("项目工作路径不是文件夹。请重新选择文件夹，或从 NEXIOM 中移除该项目。");
     if (isFilesystemRoot(root))
       throw new Error(`当前项目工作路径“${root}”是磁盘或文件系统根目录，不能用作赛题工作区。请返回“所有赛题”，点击“选择赛题工作文件夹”，选择存放本题资料的具体文件夹（例如 ${path.join(root, "赛题", "A题")}）。`);
+    assertWorkspaceDrive(root);
     if (path.relative(configuredRoot, root) !== "")
       throw new Error("项目工作文件夹已被链接到其他位置。请移除该项目，再选择实际的赛题工作文件夹。");
     return { ...project, root };
@@ -522,6 +556,7 @@ export class CoreService {
       throw new Error("请选择文件夹。");
     if (isFilesystemRoot(resolved))
       throw new Error(`所选路径“${resolved}”是磁盘或文件系统根目录。请选择具体的赛题工作文件夹（例如 ${path.join(resolved, "赛题", "A题")}）。`);
+    assertWorkspaceDrive(resolved);
     const existing = this.db
       .prepare("SELECT * FROM projects WHERE root=?")
       .get(resolved) as unknown as Project | undefined;
@@ -863,7 +898,11 @@ export class CoreService {
         return { ...this.snapshot(), runId };
       }
       case "project.create": {
-        const root = path.join(this.dataDir, "projects", randomUUID());
+        if (workspaceDriveEnforced() && command.name !== CASUAL_PROJECT_NAME)
+          throw new Error("请选择赛题工作文件夹。NEXIOM 不会在 C 盘或应用数据目录里创建赛题工作区。");
+        const root = workspaceDriveEnforced()
+          ? casualWorkspaceRoot()
+          : path.join(this.dataDir, "projects", randomUUID());
         mkdirSync(path.join(root, "inputs"), { recursive: true });
         return this.openProject(root, command.name);
       }

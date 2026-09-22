@@ -158,6 +158,20 @@ export function getAgentItemOutcome(record: AgentItem): AgentTaskOutcome {
   return "running";
 }
 
+function isThinkingItem(item: ThreadItem) {
+  return item.type === "reasoning" || (item.type === "agent_activity" && item.phase === "thinking");
+}
+
+// Keep the answer hidden until the thought that started before it has finished.
+export function outputBlockedByThinking(items: AgentItem[], message: AgentItem) {
+  if (message.item.type !== "agent_message" || getAgentItemOutcome(message) !== "running") return false;
+  return items.some(record =>
+    record.runId === message.runId &&
+    record.sequence < message.sequence &&
+    isThinkingItem(record.item) &&
+    getAgentItemOutcome(record) === "running");
+}
+
 export function getCurrentAgentTaskKind(
   items: AgentItem[], runId: string, fallback: AgentTaskKind = "thinking",
 ): AgentTaskKind {
@@ -170,10 +184,11 @@ export function getCurrentAgentTaskKind(
   }
   // Plans stay "running" for the entire turn. Once execution has moved on,
   // an old plan is not evidence that the agent has started planning again.
-  const latestNonPlanSequence = items.reduce((sequence, record) =>
+  const visible = items.filter(record => !outputBlockedByThinking(items, record));
+  const latestNonPlanSequence = visible.reduce((sequence, record) =>
     record.runId === runId && record.item.type !== "todo_list" ? Math.max(sequence, record.sequence) : sequence, -Infinity);
   let latest: AgentItem | undefined;
-  for (const record of items) {
+  for (const record of visible) {
     if (record.runId !== runId || record.status !== "running" || getAgentItemOutcome(record) !== "running") continue;
     if (record.item.type === "todo_list" && record.sequence < latestNonPlanSequence) continue;
     if (!latest || record.sequence > latest.sequence) latest = record;

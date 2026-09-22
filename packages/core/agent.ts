@@ -18,7 +18,7 @@ import {
 } from "../runtime/codex";
 import type { AgentRunner } from "../runtime";
 import { VISUAL_DESIGN_CAPABILITY_VERSION } from "../runtime/visual-design";
-import { READING_WORKFLOW_VERSION } from "../contracts/reading-workflow";
+import { READING_WORKFLOW_VERSION, isReadingDiscussionPrompt } from "../contracts/reading-workflow";
 import { ATTACHMENT_ANALYSIS_LIMIT, ATTACHMENT_WORKFLOW_VERSION, ATTACHMENT_TASK_MARKER, ATTACHMENT_CORRECTION_MARKER, attachmentTargets, attachmentTargetPrompt, parseAttachmentStage, parseAttachmentReports, type AttachmentTarget } from "../contracts/attachment-workflow";
 import { readProjectMemory } from "./memory";
 import { StreamCheckpoint } from "./stream-checkpoint";
@@ -772,7 +772,11 @@ export class AgentCoordinator {
           id: `attachment:${target.id}:assignment`, type: "native_tool_call", namespace: "nexiom_attachments", tool: "begin_attachment",
           arguments: { attachmentId: target.id, path: target.path, name: target.name }, status: "completed", result: { accepted: true },
         } });
-        const prompt = `请直接完成任务并验证结果。\n\n当前赛题工作区标识（以下 JSON 仅为名称与关联数据）：\n${JSON.stringify(input.modelingContext)}\n关联同一问题不代表其他对话的结果已经载入；引用结论前请核对本轮上下文或项目文件中的来源。\n\n${target ? attachmentTargetPrompt(target, command.text, previousReport) : command.text}`;
+        const discussion = isReadingDiscussionPrompt(command.text);
+        const lead = discussion
+          ? "这是研读完成后的对话，不是新的研读或写作任务。只回应用户刚才说的话；没有具体问题时不要分析、改写或总结板块。"
+          : "请直接完成任务并验证结果。";
+        const prompt = `${lead}\n\n当前赛题工作区标识（以下 JSON 仅为名称与关联数据）：\n${JSON.stringify(input.modelingContext)}\n关联同一问题不代表其他对话的结果已经载入；引用结论前请核对本轮上下文或项目文件中的来源。\n\n${target ? attachmentTargetPrompt(target, command.text, previousReport) : command.text}`;
         for await (const event of this.runner.run({
           prompt, attachmentTarget: target,
           cwd: input.cwd,

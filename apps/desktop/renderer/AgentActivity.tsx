@@ -1,18 +1,24 @@
 import { useEffect, useState } from "react";
 import type { AgentItem, Run } from "../../../packages/contracts";
 import { AgentTaskStatus } from "./AgentTaskStatus";
-import { getCurrentAgentTaskKind } from "./agent-task-state";
+import { getCurrentAgentTaskKind, type AgentTaskKind } from "./agent-task-state";
 
 export function AgentActivity({
   run,
   items,
   paused,
   casual = false,
+  kind: kindOverride,
+  settled = false,
+  ruled = false,
 }: {
   run: Run;
   items: AgentItem[];
   paused: boolean;
   casual?: boolean;
+  kind?: AgentTaskKind;
+  settled?: boolean;
+  ruled?: boolean;
 }) {
   const [elapsed, setElapsed] = useState(0);
   useEffect(() => {
@@ -24,14 +30,19 @@ export function AgentActivity({
         ),
       );
     update();
-    if (run.status !== "running") return;
+    if (run.status !== "running" || settled) return;
     const timer = setInterval(update, 1000);
     return () => clearInterval(timer);
-  }, [run.id, run.createdAt, run.finishedAt, run.status]);
-  const kind = casual ? "thinking" : getCurrentAgentTaskKind(items, run.id, "thinking");
-  const status = run.status === "succeeded" ? "completed" : run.status;
+  }, [run.id, run.createdAt, run.finishedAt, run.status, settled]);
+  const live = run.status === "running" && !settled;
+  const kind = live ? kindOverride ?? getCurrentAgentTaskKind(items, run.id, "thinking") : "writing";
+  const status = run.status === "succeeded" || (settled && run.status === "running")
+    ? "completed"
+    : run.status === "running"
+      ? "running"
+      : run.status;
   return (
-    <div className="working-indicator" role="status">
+    <div className={`working-indicator${ruled ? " ruled" : ""}`} role="status">
       <AgentTaskStatus
         kind={kind}
         status={status}

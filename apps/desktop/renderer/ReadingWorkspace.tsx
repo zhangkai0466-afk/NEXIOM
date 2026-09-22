@@ -22,7 +22,7 @@ import {
   Network,
   PanelRightClose,
   PanelRightOpen,
-  Send,
+  ArrowUp,
   Square,
   Tags,
   X,
@@ -30,15 +30,24 @@ import {
 import type { AgentItem, FileContent, Message, ProjectFile, Run } from "../../../packages/contracts";
 import { RichText } from "./AgentOutput";
 import { PdfViewer } from "./PdfViewer";
+import { AgentActivity } from "./AgentActivity";
 import { AgentTaskStatus } from "./AgentTaskStatus";
-import { getCurrentAgentTaskKind } from "./agent-task-state";
+import { NexiomMark } from "./NexiomMark";
+import { getCurrentAgentTaskKind, outputBlockedByThinking } from "./agent-task-state";
+import {
+  READING_CORRECTION_MARKER,
+  isReadingDiscussionSequence,
+  latestReadingTurnIsDiscussion,
+  parseReadingDiscussion,
+  readingDiscussionBounds,
+} from "../../../packages/contracts/reading-workflow";
 import { ReadingProgress } from "./ReadingProgress";
-import { readingCanViewReport, readingSteps } from "./reading-progress";
+import { latestFormalReadingRun, readingCanViewReport, readingSteps } from "./reading-progress";
 import { WorkspaceLogo } from "./WorkspaceLogo";
 import { readPreference, writePreference } from "./preferences";
 
 export const READING_TASK_MARKER = "[NEXIOM赛题研读任务]";
-export const READING_CORRECTION_MARKER = "[NEXIOM赛题研读纠偏]";
+export { READING_CORRECTION_MARKER };
 
 type SectionKind =
   | "overview"
@@ -61,16 +70,8 @@ interface ReadingSection {
 export interface ReadingCorrectionTarget {
   id: string;
   title: string;
+  body?: string;
 }
-
-interface ReadingCorrection {
-  id: string;
-  targetId: string;
-  targetTitle: string;
-  text: string;
-  createdAt: string;
-}
-
 
 interface ReadingWorkspaceProps {
   projectName: string;
@@ -79,6 +80,7 @@ interface ReadingWorkspaceProps {
   files: ProjectFile[];
   activeRun?: Run;
   latestRun?: Run;
+  runs?: Run[];
   busy: boolean;
   modelReady: boolean;
   researchEnabled?: boolean;
@@ -157,10 +159,13 @@ export function isReadingReport(text: string) {
 }
 
 function latestReport(messages: Message[], items: AgentItem[], afterSequence: number, excludedRunId?: string) {
+  const bounds = readingDiscussionBounds(messages, afterSequence);
+  const published = (sequence: number) => !isReadingDiscussionSequence(sequence, bounds);
   const candidates = [
     ...messages
       .filter((message) =>
         message.sequence > afterSequence &&
+        published(message.sequence) &&
         message.role === "assistant" &&
         message.kind !== "progress" &&
         isReadingReport(message.text)
@@ -168,6 +173,7 @@ function latestReport(messages: Message[], items: AgentItem[], afterSequence: nu
       .map((message) => ({ sequence: message.sequence, text: message.text })),
     ...items.flatMap((record) =>
       record.sequence > afterSequence &&
+      published(record.sequence) &&
       record.runId !== excludedRunId && record.status === "completed" &&
       record.item.type === "agent_message" &&
       isReadingReport(record.item.text)
@@ -189,25 +195,61 @@ export function draftReadingReport(items: AgentItem[], runId: string) {
     .at(-1)?.text ?? "";
 }
 
-function extractCorrections(messages: Message[], afterSequence: number): ReadingCorrection[] {
-  return messages.flatMap((message) => {
-    if (
-      message.sequence <= afterSequence ||
-      message.role !== "user" ||
-      !message.text.startsWith(READING_CORRECTION_MARKER)
-    ) return [];
-    const target = message.text.match(/【目标板块】\nID: ([^\n]+)\n标题: ([^\n]+)\n\n【人工纠偏】/);
-    const correction = message.text.match(/【人工纠偏】\n([\s\S]*?)\n\n【更新要求】/);
-    return target && correction?.[1]?.trim()
-      ? [{
-          id: message.id,
-          targetId: target[1].trim(),
-          targetTitle: target[2].trim(),
-          text: correction[1].trim(),
-          createdAt: message.createdAt,
-        }]
-      : [];
-  });
+interface ReadingDiscussionReply {
+  id: string;
+  sequence: number;
+  text: string;
+  streaming: boolean;
+}
+
+interface ReadingDiscussionTurn {
+  id: string;
+  targetId: string;
+  targetTitle: string;
+  text: string;
+  createdAt: string;
+  sequence: number;
+  replies: ReadingDiscussionReply[];
+}
+
+function discussionTurns(messages: Message[], items: AgentItem[], afterSequence: number): ReadingDiscussionTurn[] {
+  const bounds = readingDiscussionBounds(messages, afterSequence);
+  return [...messages]
+    .filter((message) => message.sequence > afterSequence && message.role === "user")
+    .sort((left, right) => left.sequence - right.sequence)
+    .flatMap((message) => {
+      const parsed = parseReadingDiscussion(message.text);
+      const bound = bounds.find((item) => item.start === message.sequence);
+      if (!parsed || !bound) return [];
+      const replies = [
+        ...items.flatMap((record) => {
+          if (record.sequence <= bound.start || record.sequence >= bound.end || record.item.type !== "agent_message") return [];
+          if (outputBlockedByThinking(items, record)) return [];
+          const streaming = record.status === "running";
+          if (!record.item.text.trim() && !streaming) return [];
+          return [{ id: record.id, sequence: record.sequence, text: record.item.text, streaming }];
+        }),
+        ...messages.flatMap((reply) => {
+          if (reply.sequence <= bound.start || reply.sequence >= bound.end || reply.role !== "assistant" || reply.kind === "progress") return [];
+          const duplicated = items.some((record) =>
+            record.sequence > bound.start &&
+            record.sequence < bound.end &&
+            record.item.type === "agent_message" &&
+            record.item.text.trim() === reply.text.trim(),
+          );
+          return duplicated ? [] : [{ id: reply.id, sequence: reply.sequence, text: reply.text, streaming: false }];
+        }),
+      ].sort((left, right) => left.sequence - right.sequence);
+      return [{
+        id: message.id,
+        targetId: parsed.id,
+        targetTitle: parsed.title,
+        text: parsed.opinion,
+        createdAt: message.createdAt,
+        sequence: message.sequence,
+        replies,
+      }];
+    });
 }
 
 const READING_CORRECTION_MIN = 280;
@@ -239,6 +281,7 @@ export function ReadingWorkspace({
   files,
   activeRun,
   latestRun,
+  runs = [],
   busy,
   modelReady,
   researchEnabled = false,
@@ -255,6 +298,9 @@ export function ReadingWorkspace({
     .filter((message) => message.role === "user" && message.text.startsWith(READING_TASK_MARKER))
     .reduce((latest, message) => Math.max(latest, message.sequence), -1);
   const hasStructuredReading = readingStartSequence >= 0;
+  const discussionTurn = latestReadingTurnIsDiscussion(messages, readingStartSequence);
+  const discussing = !!activeRun && discussionTurn;
+  const formalRun = latestFormalReadingRun(runs.length ? runs : latestRun ? [latestRun] : [], agentItems);
   const [viewingReport, setViewingReport] = useState(false);
   const report = useMemo(
     () => hasStructuredReading ? latestReport(messages, agentItems, readingStartSequence, latestRun?.status !== "succeeded" ? latestRun?.id : undefined) : "",
@@ -264,11 +310,11 @@ export function ReadingWorkspace({
     () => activeRun ? draftReadingReport(agentItems, activeRun.id) : "",
     [agentItems, activeRun],
   );
-  const shownReport = viewingReport && activeRun ? draftReport || report : report;
+  const shownReport = viewingReport && activeRun && !discussing ? draftReport || report : report;
   const sections = useMemo(() => parseReadingReport(shownReport), [shownReport]);
-  const corrections = useMemo(
-    () => extractCorrections(messages, readingStartSequence),
-    [messages, readingStartSequence],
+  const turns = useMemo(
+    () => discussionTurns(messages, agentItems, readingStartSequence),
+    [messages, agentItems, readingStartSequence],
   );
   const [activeSection, setActiveSection] = useState("");
   const [correctionOpen, setCorrectionOpen] = useState(() => window.innerWidth >= 1180);
@@ -287,19 +333,23 @@ export function ReadingWorkspace({
   const sourceRequest = useRef(0);
   const workspaceGrid = useRef<HTMLDivElement>(null);
   const correctionPanel = useRef<HTMLElement>(null);
+  const correctionHistory = useRef<HTMLDivElement>(null);
   const correctionButton = useRef<HTMLButtonElement>(null);
   const correctionResize = useRef({ active: false, pointerId: -1, startX: 0, startWidth: 360, currentWidth: 360 });
   const selected = sections.find((section) => section.id === activeSection) ?? sections[0];
   const pdfFiles = files.filter(isProblemPdf);
   const selectedSource = pdfFiles.find((file) => file.path === sourcePath);
   const correctionTarget: ReadingCorrectionTarget | undefined = selectedSource
-    ? { id: `source:${selectedSource.path}`, title: `原题 · ${selectedSource.name}` }
-    : selected ? { id: selected.id, title: selected.title } : undefined;
-  const targetCorrections = correctionTarget
-    ? corrections.filter((correction) => correction.targetId === correctionTarget.id)
+    ? { id: `source:${selectedSource.path}`, title: `原题 · ${selectedSource.name}`, body: "当前打开的是原题 PDF，不是报告正文。请只讨论对这份原题的理解，不要重新研读。" }
+    : selected ? { id: selected.id, title: selected.title, body: selected.body } : undefined;
+  const targetTurns = correctionTarget
+    ? turns.filter((turn) => turn.targetId === correctionTarget.id)
     : [];
+  const latestDiscussion = turns.at(-1);
+  const discussionRun = discussionTurn && latestDiscussion?.targetId === correctionTarget?.id ? activeRun ?? latestRun : undefined;
+  const reduceMotion = document.documentElement.dataset.reduceMotion === "true";
   const correctionDraft = correctionTarget ? correctionDrafts[correctionTarget.id] ?? "" : "";
-  const failed = hasStructuredReading && latestRun && ["failed", "cancelled", "interrupted"].includes(latestRun.status);
+  const failed = hasStructuredReading && latestRun && !discussionTurn && ["failed", "cancelled", "interrupted"].includes(latestRun.status);
   const currentTaskKind = activeRun ? getCurrentAgentTaskKind(agentItems, activeRun.id) : "thinking";
   const runOutcome = activeRun ? "running" : latestRun?.status === "succeeded" ? "completed" : latestRun?.status;
   const displayedCorrectionWidth = Math.min(correctionWidth, correctionMax);
@@ -318,8 +368,8 @@ export function ReadingWorkspace({
   }, [!!report, !!activeRun, restarting, animatedRunId]);
 
   useEffect(() => {
-    if (activeRun) setViewingReport(false);
-  }, [activeRun?.id]);
+    if (activeRun && !discussing) setViewingReport(false);
+  }, [activeRun?.id, discussing]);
 
   useEffect(() => {
     if (activeRun || report) return;
@@ -327,7 +377,10 @@ export function ReadingWorkspace({
   }, [activeRun, viewingReport, report]);
 
   useEffect(() => {
-    if (activeRun) { setAnimatedRunId(activeRun.id); return; }
+    if (activeRun) {
+      setAnimatedRunId(discussing ? null : activeRun.id);
+      return;
+    }
     if (!animatedRunId) return;
     const completed = latestRun?.id === animatedRunId && latestRun.status === "succeeded";
     if (!completed) { setAnimatedRunId(null); return; }
@@ -335,7 +388,15 @@ export function ReadingWorkspace({
     if (reduced) { setAnimatedRunId(null); return; }
     const timer = setTimeout(() => setAnimatedRunId(null), 650);
     return () => clearTimeout(timer);
-  }, [activeRun?.id, latestRun?.id, latestRun?.status, animatedRunId]);
+  }, [activeRun?.id, discussing, latestRun?.id, latestRun?.status, animatedRunId]);
+
+  const discussionSignature = targetTurns.map((turn) => turn.id + ":" + turn.replies.map((reply) => reply.sequence + ":" + reply.text.length + ":" + reply.streaming).join(",")).join("|");
+  useEffect(() => {
+    const node = correctionHistory.current;
+    if (!node) return;
+    const distance = node.scrollHeight - node.scrollTop - node.clientHeight;
+    if (distance < 96) node.scrollTop = node.scrollHeight;
+  }, [discussionSignature, correctionOpen, correctionTarget?.id]);
 
   useEffect(() => {
     if (!sections.length) return;
@@ -460,8 +521,8 @@ export function ReadingWorkspace({
     else setCorrectionPanelWidth(displayedCorrectionWidth + (event.key === "ArrowLeft" ? 16 : -16), true);
   };
 
-  if (progressHistory && latestRun && !activeRun) {
-    return <ReadingProgress key={`history:${latestRun.id}`} run={latestRun} items={agentItems} onCancel={onCancel} history
+  if (progressHistory && formalRun && !activeRun) {
+    return <ReadingProgress key={`history:${formalRun.id}`} run={formalRun} items={agentItems} onCancel={onCancel} history
       onBack={() => setProgressHistory(false)} backLabel={report && !restarting ? "返回研读报告" : "返回输入"} />;
   }
 
@@ -529,7 +590,7 @@ export function ReadingWorkspace({
                 文献联网检索：{researchEnabled ? "已允许" : "未允许"}
               </button>}
               {failed && <div className="reading-run-error" role="alert"><AgentTaskStatus compact status={latestRun!.status === "failed" ? "failed" : latestRun!.status === "cancelled" ? "cancelled" : "interrupted"} /></div>}
-              {hasStructuredReading && latestRun && <button type="button" className="reading-research-setting" onClick={() => setProgressHistory(true)}>查看研读过程</button>}
+              {hasStructuredReading && formalRun && <button type="button" className="reading-research-setting" onClick={() => setProgressHistory(true)}>查看研读过程</button>}
             </form>
           </div>
         </div>
@@ -538,8 +599,8 @@ export function ReadingWorkspace({
   }
 
   const canViewReport = !!activeRun && readingCanViewReport(readingSteps(agentItems, activeRun), activeRun);
-  if (activeRun && !viewingReport) return <ReadingProgress key={activeRun.id} run={activeRun} items={agentItems} onCancel={onCancel} onViewReport={canViewReport ? () => setViewingReport(true) : undefined} />;
-  if (!viewingReport && latestRun?.id === animatedRunId && latestRun.status === "succeeded" && report) {
+  if (activeRun && !discussing && !viewingReport) return <ReadingProgress key={activeRun.id} run={activeRun} items={agentItems} onCancel={onCancel} onViewReport={canViewReport ? () => setViewingReport(true) : undefined} />;
+  if (!discussing && !viewingReport && latestRun?.id === animatedRunId && latestRun.status === "succeeded" && report) {
     return <ReadingProgress key={latestRun.id} run={latestRun} items={agentItems} onCancel={onCancel} />;
   }
   if (viewingReport && activeRun && !shownReport) {
@@ -563,13 +624,13 @@ export function ReadingWorkspace({
           <div>
             <span className="reading-eyebrow"><BookOpen size={14} />{projectName}</span>
             <h1>赛题研读报告</h1>
-            <p>{activeRun ? "正在根据新的信息更新报告" : `已整理 ${sections.length} 个研读板块`}</p>
+            <p>{discussing ? "正在讨论当前板块，已发布报告保持不变" : activeRun ? "正在根据新的信息更新报告" : `已整理 ${sections.length} 个研读板块`}</p>
           </div>
         </div>
         <div className="reading-report-actions">
-          {runOutcome && <AgentTaskStatus kind={currentTaskKind} status={runOutcome} compact final />}
-          {activeRun && <button type="button" className="secondary-button" onClick={() => setViewingReport(false)}><ArrowLeft size={15} />返回进度</button>}
-          {!activeRun && latestRun && <button type="button" className="secondary-button" onClick={() => setProgressHistory(true)}><History size={15} />研读过程</button>}
+          {runOutcome && !discussionTurn && <AgentTaskStatus kind={currentTaskKind} status={runOutcome} compact final />}
+          {activeRun && !discussing && <button type="button" className="secondary-button" onClick={() => setViewingReport(false)}><ArrowLeft size={15} />返回进度</button>}
+          {!activeRun && formalRun && <button type="button" className="secondary-button" onClick={() => setProgressHistory(true)}><History size={15} />研读过程</button>}
           <button
             type="button"
             className="secondary-button"
@@ -591,7 +652,7 @@ export function ReadingWorkspace({
           >
             {correctionOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
             人工纠偏
-            {!!targetCorrections.length && <span className="reading-correction-count">{targetCorrections.length}</span>}
+            {!!targetTurns.length && <span className="reading-correction-count">{targetTurns.length}</span>}
           </button>
         </div>
       </header>
@@ -677,23 +738,54 @@ export function ReadingWorkspace({
                 <div><MessageSquareText size={18} /><strong>人工纠偏</strong></div>
                 <span className="reading-correction-target">{correctionTarget?.title}</span>
               </header>
-              <div className="reading-correction-history" aria-label="当前板块纠偏记录">
-                {targetCorrections.map((correction, index) => (
-                <div className="reading-correction-item" key={correction.id}>
-                  <span>批注 {String(index + 1).padStart(2, "0")}</span>
-                  <p>{correction.text}</p>
-                  <small>{new Date(correction.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</small>
-                </div>
+              <div className="reading-correction-history" ref={correctionHistory} aria-label="当前板块讨论">
+                {targetTurns.length === 0 ? (
+                  <div className="thread-empty reading-discussion-empty">
+                    <div className="empty-mark"><NexiomMark /></div>
+                    <h1>聊点什么？</h1>
+                  </div>
+                ) : targetTurns.map((turn) => (
+                  <div key={turn.id}>
+                    <article className="message user note">
+                      <div className="message-body">{turn.text}</div>
+                    </article>
+                    {turn.replies.map((reply) => {
+                      const record = agentItems.find((item) => item.id === reply.id);
+                      const replyRun = record ? runs.find((item) => item.id === record.runId) : undefined;
+                      const run = replyRun ?? (reply.streaming ? discussionRun : undefined);
+                      const lastOfRun = run ? turn.replies.reduce<(typeof reply) | undefined>((chosen, item) => {
+                        const match = agentItems.find((agent) => agent.id === item.id);
+                        return (match?.runId ?? (item.streaming ? discussionRun?.id : undefined)) === run.id && (!chosen || item.sequence > chosen.sequence) ? item : chosen;
+                      }, undefined) : undefined;
+                      const streaming = !!reply.streaming && run?.status === "running";
+                      const showHeader = !!run && lastOfRun?.id === reply.id && (streaming || !!reply.text.trim());
+                      return reply.text.trim() || reply.streaming ? (
+                        <article className={`message assistant answer${reply.streaming ? " streaming" : ""}`} key={reply.id}>
+                          {showHeader && run && (
+                            <AgentActivity run={run} items={agentItems} paused={reduceMotion} casual kind={streaming ? "writing" : undefined} settled={!streaming} ruled />
+                          )}
+                          {reply.text.trim() ? <div className="message-body"><RichText text={reply.text} /></div> : null}
+                        </article>
+                      ) : null;
+                    })}
+                    {discussionRun && turn.id === latestDiscussion?.id && discussionRun.status === "running" && !turn.replies.some((reply) => reply.streaming || reply.text.trim()) && (
+                      <AgentActivity run={discussionRun} items={agentItems} paused={reduceMotion} casual />
+                    )}
+                  </div>
                 ))}
               </div>
-              <form className="reading-correction-form" onSubmit={correct}>
+              <form className="composer reading-discussion-composer" onSubmit={correct}>
                 <textarea
-                  aria-label={`纠偏${correctionTarget?.title ?? "当前板块"}`}
+                  aria-label={`讨论${correctionTarget?.title ?? "当前板块"}`}
+                  placeholder="向 NEXIOM 发送任务…"
                   value={correctionDraft}
                   maxLength={4000}
-                  disabled={busy || !!activeRun || !correctionTarget}
+                  disabled={!correctionTarget}
                   onChange={(event) => {
                     if (!correctionTarget) return;
+                    const field = event.target;
+                    field.style.height = "auto";
+                    field.style.height = `${Math.min(220, field.scrollHeight)}px`;
                     setCorrectionDrafts((current) => ({ ...current, [correctionTarget.id]: event.target.value }));
                   }}
                   onKeyDown={(event) => {
@@ -703,16 +795,19 @@ export function ReadingWorkspace({
                     }
                   }}
                 />
-                <div>
-                  {activeRun ? (
-                    <button type="button" className="reading-correction-send" aria-label="停止更新" onClick={onCancel}>
-                      <Square size={13} />
-                    </button>
-                  ) : (
-                    <button className="reading-correction-send" aria-label="提交当前板块纠偏" disabled={!correctionDraft.trim() || busy || !correctionTarget}>
-                      <Send size={15} />
-                    </button>
-                  )}
+                <div className="composer-toolbar">
+                  <div className="composer-tools" />
+                  <div className="composer-right">
+                    {activeRun ? (
+                      <button type="button" className="icon-button" aria-label={discussing ? "停止讨论" : "停止研读"} title={discussing ? "停止讨论" : "停止研读"} onClick={onCancel}>
+                        <Square size={16} />
+                      </button>
+                    ) : (
+                      <button className="send-button" type="submit" title="发送" aria-label="发送当前板块的意见" disabled={!correctionDraft.trim() || busy || !correctionTarget}>
+                        <ArrowUp size={18} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               </form>
             </aside>

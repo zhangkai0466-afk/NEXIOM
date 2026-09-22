@@ -8,8 +8,8 @@ async function load(file) {
   return import(`data:text/javascript;base64,${Buffer.from(result.outputFiles[0].text).toString("base64")}`);
 }
 const { createReadingTools, readingWebSearchMode } = await load("../packages/runtime/reading-tools.ts");
-const { readingSteps, readingProgressNotice, readingCanViewReport } = await load("../apps/desktop/renderer/reading-progress.ts");
-const { readingWorkflowInstructions, readingReportStructure } = await load("../packages/contracts/reading-workflow.ts");
+const { readingSteps, readingProgressNotice, readingCanViewReport, latestFormalReadingRun } = await load("../apps/desktop/renderer/reading-progress.ts");
+const { readingWorkflowInstructions, readingReportStructure, readingDiscussionInstructions, readingDeveloperInstructions, buildReadingDiscussionPrompt, parseReadingDiscussion, readingDiscussionBounds, isReadingDiscussionSequence, latestReadingTurnIsDiscussion, READING_CORRECTION_MARKER } = await load("../packages/contracts/reading-workflow.ts");
 const { readingProseTables } = await load("../apps/desktop/renderer/reading-prose-tables.ts");
 const { getCurrentAgentTaskKind } = await load("../apps/desktop/renderer/agent-task-state.ts");
 const input = { stageId: "reading", signal: new AbortController().signal, settings: { network: true } };
@@ -232,18 +232,22 @@ test("rereading and analysis update the same review node without reopening the f
   }
 });
 
-test("another search reuses its node and leaves verification pending until a real review occurs", () => {
+test("another search reuses its node and hides verification until a real review occurs", () => {
   const items = phaseSequence(["reading", "analyzing", "thinking", "searching", "thinking"]);
   const startSearch = progress(6, "searching", "running", "search-2");
   const duringSearch = readingSteps([...items, startSearch], run);
-  assert.deepEqual(duringSearch.slice(-2), [step("searching", "searching", "running"), step("verification", "thinking", "pending")]);
+  assert.deepEqual(duringSearch.at(-1), step("searching", "searching", "running"));
+  assert.equal(duringSearch.some(step => step.id.startsWith("verification") || step.status === "pending"), false);
   assert.equal(duringSearch.filter(step => step.status === "running").length, 1);
   const afterSearch = [...items, progress(6, "searching", "completed", "search-2")];
-  assert.deepEqual(readingSteps(afterSearch, run).slice(-2), [step("searching", "searching", "completed"), step("verification", "thinking", "pending")]);
+  assert.deepEqual(readingSteps(afterSearch, run).at(-1), step("searching", "searching", "completed"));
+  assert.equal(readingSteps(afterSearch, run).some(step => step.id.startsWith("verification")), false);
   for (const [status, outcome] of [["cancelled", "cancelled"], ["failed", "failed"], ["interrupted", "interrupted"], ["succeeded", "interrupted"]]) {
     const ended = readingSteps([...items, startSearch], { ...run, status });
-    assert.deepEqual(ended.slice(-2).map(step => step.status), [outcome, outcome]);
-    assert.ok(ended.slice(0, -2).every(step => step.status === "completed"));
+    assert.equal(ended.at(-1).status, outcome);
+    assert.equal(ended.at(-1).kind, "searching");
+    assert.ok(ended.slice(0, -1).every(step => step.status === "completed"));
+    assert.equal(ended.some(step => step.id.startsWith("verification")), false);
   }
   assert.deepEqual(readingSteps([...afterSearch, progress(7, "thinking", "running", "verify-2")], run).at(-1), step("verification", "thinking", "running"));
   assert.deepEqual(readingSteps([...afterSearch, progress(7, "thinking", "completed", "verify-2")], run).at(-1), step("verification", "thinking", "completed"));
@@ -363,4 +367,50 @@ test("wide narrative tables become prose without losing links, equations or shor
 test("workflow covers key terminology, source verification, leakage, dependencies and human choice", () => {
   for (const text of ["背景知识", "国家/行业标准", "DOI/URL", "测试期数据", "单程还是往返效率", "继承、修改、不适用、待核实", "人工纠偏", "共同讨论", "不能假定当前赛题就是某届C题", "不能提前一次性打完全部阶段标记", "同一时刻只推进一个主阶段", "不要为这些内部事件反复创建节点"])
     assert.ok(readingWorkflowInstructions.includes(text), text);
+});
+
+test("completed reading discussion rejects stage tools and does not replace the report", async () => {
+  const legacy = READING_CORRECTION_MARKER + "\n\n【目标板块】\nID: question-1\n标题: 问题一\n\n【人工纠偏】\n效率应按单程理解\n\n【更新要求】\n重新输出完整报告";
+  assert.deepEqual(parseReadingDiscussion(legacy), { id: "question-1", title: "问题一", opinion: "效率应按单程理解" });
+  const prompt = buildReadingDiscussionPrompt("这里不该写成往返效率", {
+    id: "terms",
+    title: "名词、符号与数据口径",
+    body: "正文里出现【人工意见】和【讨论要求】也不该截断。往返效率尚未证实。",
+  });
+  assert.match(prompt, /【人工意见】/);
+  assert.match(prompt, /往返效率尚未证实/);
+  assert.equal(parseReadingDiscussion(prompt)?.opinion, "这里不该写成往返效率");
+  assert.doesNotMatch(prompt, /重新输出完整报告|沿用研读阶段顺序|set_reading_stage/);
+  const wrapped = "请直接完成任务并验证结果。\n\n" + prompt;
+  const tools = createReadingTools({ ...input, prompt: wrapped });
+  const rejected = await tools.call("nexiom_reading", "set_reading_stage", { phase: "thinking", status: "running", stepId: "again" });
+  assert.equal(rejected.success, false);
+  assert.match(rejected.contentItems[0].text, /不能上报或重开研读阶段/);
+  assert.match(prompt, /打招呼/);
+  assert.match(prompt, /不要复述、改写、总结或分析当前内容/);
+  assert.match(readingDiscussionInstructions, /禁止调用 nexiom_reading\.set_reading_stage/);
+  assert.match(readingDiscussionInstructions, /禁止重新输出整份赛题研读报告/);
+  assert.match(readingDiscussionInstructions, /不要把寒暄展开成题面分析/);
+  assert.match(readingDeveloperInstructions(wrapped, true), /禁止调用 nexiom_reading\.set_reading_stage/);
+  assert.doesNotMatch(readingDeveloperInstructions(wrapped, true), /文献联网检索/);
+  assert.match(readingDeveloperInstructions("正式研读", true), /每段实际工作开始前调用 nexiom_reading\.set_reading_stage/);
+  assert.match(readingWorkflowInstructions, /不得借纠偏重开阶段/);
+  assert.doesNotMatch(readingWorkflowInstructions, /每轮人工纠偏也先核对/);
+  const messages = [
+    { sequence: 1, role: "user", text: "[NEXIOM赛题研读任务]" },
+    { sequence: 5, role: "user", text: prompt },
+    { sequence: 9, role: "assistant", text: "# 赛题研读报告\n## 赛题概览\n讨论不该替换报告" },
+    { sequence: 12, role: "user", text: "[NEXIOM赛题研读任务]\n重新研读" },
+  ];
+  const bounds = readingDiscussionBounds(messages, 1);
+  assert.deepEqual(bounds, [{ start: 5, end: 12 }]);
+  assert.equal(isReadingDiscussionSequence(9, bounds), true);
+  assert.equal(isReadingDiscussionSequence(13, bounds), false);
+  assert.equal(latestReadingTurnIsDiscussion(messages, 1), false);
+  assert.equal(latestReadingTurnIsDiscussion(messages.slice(0, 3), 1), true);
+  const formal = { id: "formal", createdAt: "2026-09-22T00:00:00.000Z", status: "succeeded" };
+  const discussion = { id: "discussion", createdAt: "2026-09-22T00:10:00.000Z", status: "succeeded" };
+  const accepted = { id: "stage", runId: "formal", sequence: 2, status: "completed", item: { type: "native_tool_call", namespace: "nexiom_reading", tool: "set_reading_stage", status: "completed", arguments: { stepId: "read", phase: "reading", status: "completed" } } };
+  const denied = { id: "denied", runId: "discussion", sequence: 8, status: "completed", item: { type: "native_tool_call", namespace: "nexiom_reading", tool: "set_reading_stage", status: "completed", arguments: { stepId: "again", phase: "thinking", status: "running" }, error: { message: "不能重开" } } };
+  assert.equal(latestFormalReadingRun([discussion, formal], [accepted, denied])?.id, "formal");
 });

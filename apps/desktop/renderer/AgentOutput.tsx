@@ -1,4 +1,4 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, memo, type ReactNode } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -99,10 +99,12 @@ export const AgentOutput = memo(function AgentOutput({
   record,
   openFile,
   showProgress = true,
+  activity,
 }: {
   record: AgentItem;
   openFile: (path: string) => void;
   showProgress?: boolean;
+  activity?: ReactNode;
 }) {
   const [copied, setCopied] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -125,10 +127,8 @@ export const AgentOutput = memo(function AgentOutput({
           <img src={logo} alt="" />
           <strong>NEXIOM</strong>
         </div>
+        {activity}
         <RichText text={item.text} openFile={openFile} />
-        {showStatus && outcome !== "completed" && (
-          <AgentTaskStatus kind="writing" status={outcome} compact className="nexiom-task-streaming" />
-        )}
         <button
           className="icon-button copy-answer"
           aria-label="复制答复"

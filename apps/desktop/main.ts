@@ -23,6 +23,7 @@ import {
 } from "node:fs/promises";
 import { commandSchema, type CoreResponse } from "../../packages/contracts";
 import { cleanStorage } from "../../packages/core/storage-cleanup";
+import { assertNotSystemDrive } from "../../packages/core/workspace-location";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -434,7 +435,10 @@ else {
     worker = utilityProcess.fork(
       path.join(__dirname, "core.cjs"),
       [path.join(app.getPath("userData"), "workspace")],
-      { serviceName: "NEXIOM Core" },
+      {
+        serviceName: "NEXIOM Core",
+        env: { ...process.env, NEXIOM_ENFORCE_WORKSPACE_DRIVE: "1" },
+      },
     );
     alive = true;
     worker.on("message", (packet) => {
@@ -731,9 +735,9 @@ else {
         title: "选择赛题工作文件夹",
         buttonLabel: "选择此文件夹",
       });
-      return selection.canceled
-        ? null
-        : request({ openPath: selection.filePaths[0] });
+      if (selection.canceled) return null;
+      assertNotSystemDrive(selection.filePaths[0]);
+      return request({ openPath: selection.filePaths[0] });
     });
     ipcMain.handle("project:choose-folder", async (event) => {
       assertSender(event);
@@ -742,13 +746,16 @@ else {
         title: "添加项目文件夹",
         buttonLabel: "添加",
       });
-      return selection.canceled ? null : selection.filePaths[0];
+      if (selection.canceled) return null;
+      assertNotSystemDrive(selection.filePaths[0]);
+      return selection.filePaths[0];
     });
     ipcMain.handle("project:open-selected", async (event, root: unknown, name: unknown) => {
       assertSender(event);
       await restoreSecrets;
       if (typeof root !== "string" || !root.trim())
         throw new Error("请选择源文件夹。");
+      assertNotSystemDrive(root);
       if (typeof name !== "string" || !name.trim() || name.trim().length > 80)
         throw new Error("请输入有效的项目名称。");
       return request({ openPath: root, openName: name.trim() });

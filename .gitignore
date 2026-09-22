@@ -2,6 +2,7 @@ node_modules/
 .build/
 dist/
 .local/
+casual/
 output/
 .playwright-cli/
 *.log

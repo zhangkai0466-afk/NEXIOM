@@ -830,3 +830,50 @@ test("a newer schema is refused without downgrading its version", async (t) => {
   assert.equal(db.prepare("PRAGMA user_version").get().user_version, 99);
   db.close();
 });
+
+function restoreEnv(name, previous) {
+  if (previous === undefined) delete process.env[name];
+  else process.env[name] = previous;
+}
+
+test("desktop workspaces cannot stay on the C drive", async (t) => {
+  const previousEnforce = process.env.NEXIOM_ENFORCE_WORKSPACE_DRIVE;
+  const previousCasual = process.env.NEXIOM_CASUAL_ROOT;
+  const casualRoot = path.join("D:\\NEXIOM", ".local", `casual-policy-${randomUUID()}`);
+  const dir = await mkdtemp(path.join(tmpdir(), "nexiom-drive-policy-"));
+  delete process.env.NEXIOM_ENFORCE_WORKSPACE_DRIVE;
+  let core = new CoreService(dir);
+  t.after(async () => {
+    restoreEnv("NEXIOM_ENFORCE_WORKSPACE_DRIVE", previousEnforce);
+    restoreEnv("NEXIOM_CASUAL_ROOT", previousCasual);
+    await core.close();
+    await rm(dir, { recursive: true, force: true });
+    await rm(casualRoot, { recursive: true, force: true });
+  });
+
+  const created = await core.request({ type: "project.create", name: "__nexiom_casual_chat__" });
+  await writeFile(path.join(created.project.root, "inputs", "note.txt"), "hello");
+  assert.match(created.project.root, /^C:/i);
+  await core.close();
+
+  process.env.NEXIOM_ENFORCE_WORKSPACE_DRIVE = "1";
+  process.env.NEXIOM_CASUAL_ROOT = casualRoot;
+  core = new CoreService(dir);
+  const casual = core.snapshot().snapshot.projects.find((item) => item.name === "__nexiom_casual_chat__");
+  assert.equal(casual.root, await realpath(casualRoot));
+  assert.equal(await readFile(path.join(casual.root, "inputs", "note.txt"), "utf8"), "hello");
+
+  await assert.rejects(
+    core.openProject(dir),
+    /不能放在 C 盘/,
+  );
+  await assert.rejects(
+    core.request({ type: "project.create", name: "2026国赛C题" }),
+    /请选择赛题工作文件夹/,
+  );
+  const contest = path.join(casualRoot, "..", `contest-${randomUUID()}`);
+  await mkdir(contest);
+  t.after(() => rm(contest, { recursive: true, force: true }));
+  const opened = await core.openProject(contest, "正式赛题");
+  assert.equal(opened.project.root, await realpath(contest));
+});

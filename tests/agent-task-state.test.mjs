@@ -11,7 +11,7 @@ const compiled = await build({
   format: "esm",
   write: false,
 });
-const { AGENT_TASK_STATES, getAgentTaskKind, getAgentItemOutcome, getCurrentAgentTaskKind } =
+const { AGENT_TASK_STATES, getAgentTaskKind, getAgentItemOutcome, getCurrentAgentTaskKind, outputBlockedByThinking } =
   await import(`data:text/javascript;base64,${Buffer.from(compiled.outputFiles[0].text).toString("base64")}`);
 const compiledEvents = await build({
   entryPoints: [fileURLToPath(new URL("../packages/runtime/app-server.ts", import.meta.url))],
@@ -170,4 +170,18 @@ test("a persistent native plan does not reclaim activity after its tool finishes
   assert.equal(getCurrentAgentTaskKind(items, "current", "planning"), "planning");
   assert.equal(getCurrentAgentTaskKind([...items].reverse(), "current"), "thinking");
   assert.equal(getCurrentAgentTaskKind([plan, record(doneCommand.item, "completed", 99, "another-run")], "current"), "planning");
+});
+
+test("an answer stays hidden until the thought that started before it finishes", () => {
+  const thought = record({ id: "thought", type: "agent_activity", phase: "thinking" }, "running", 1);
+  const answer = record({ id: "answer", type: "agent_message", text: "正文" }, "running", 2);
+  assert.equal(outputBlockedByThinking([answer, thought], answer), true);
+  assert.equal(getCurrentAgentTaskKind([answer, thought], "current"), "thinking");
+  const finishedThought = { ...thought, status: "completed" };
+  assert.equal(outputBlockedByThinking([finishedThought, answer], answer), false);
+  assert.equal(getCurrentAgentTaskKind([finishedThought, answer], "current"), "writing");
+  const laterThought = record({ id: "later", type: "agent_activity", phase: "thinking" }, "running", 3);
+  assert.equal(outputBlockedByThinking([finishedThought, answer, laterThought], answer), false);
+  const published = { ...answer, status: "completed" };
+  assert.equal(outputBlockedByThinking([thought, published], published), false);
 });

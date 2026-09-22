@@ -40,9 +40,9 @@ function ModelingIcon({ size = 18 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="-128 -128 1280 1280" className="modeling-hierarchy-icon" aria-hidden="true"><path d="M896 682.666667V469.333333h-341.333333V341.333333H768V0H256v341.333333h213.333333v128h-341.333333V682.666667H0v341.333333h341.333333V682.666667H213.333333V554.666667h597.333334V682.666667H682.666667v341.333333h341.333333V682.666667h-128zM256 768v170.666667H85.333333V768h170.666667z m85.333333-512V85.333333h341.333334v170.666667H341.333333z m597.333334 682.666667H768V768h170.666667v170.666667z" /></svg>;
 }
 
-function SidebarAgentActivity({ run, items, casual = false }: { run?: Run; items: AgentItem[]; casual?: boolean }) {
+function SidebarAgentActivity({ run, items }: { run?: Run; items: AgentItem[] }) {
   if (!run) return null;
-  const kind = casual ? "thinking" : getCurrentAgentTaskKind(items, run.id, "thinking");
+  const kind = getCurrentAgentTaskKind(items, run.id, "thinking");
   return <span className="nexiom-task-sidebar-activity" role="img" aria-label={AGENT_TASK_STATES[kind].label} title={AGENT_TASK_STATES[kind].label}><AgentTaskIcon kind={kind} size={12} /></span>;
 }
 
@@ -255,7 +255,7 @@ export function ModelingSidebar({ projects, project, threads, casualThreads = []
     <button className={`modeling-thread ${casualSelected && threadId === item.id ? "active" : ""} ${item.unread ? "unread" : ""}`} aria-current={casualSelected && threadId === item.id ? "page" : undefined} title={item.title} disabled={busy} onClick={() => onThread(item)} onKeyDown={(event) => { if (event.key === "F2") { event.preventDefault(); onRenameThread(item); } }}>
       <span>{item.title}</span>
       {item.unread && <span className="modeling-unread" aria-label="未读" />}
-      <SidebarAgentActivity run={runs.find((run) => run.threadId === item.id && run.status === "running")} items={agentItems} casual />
+      <SidebarAgentActivity run={runs.find((run) => run.threadId === item.id && run.status === "running")} items={agentItems} />
     </button>
     <button className="modeling-thread-more" aria-label={`${item.title}的对话菜单`} aria-haspopup="menu" aria-expanded={threadMenu?.thread.id === item.id} aria-controls={threadMenu?.thread.id === item.id ? "modeling-thread-menu" : undefined} title="对话菜单" disabled={busy} onClick={(event) => openThreadMenu(item, event.currentTarget)} onKeyDown={(event) => {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openThreadMenu(item, event.currentTarget, false); }

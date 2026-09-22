@@ -1473,7 +1473,7 @@ a {
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--line);
-  background: var(--panel);
+  background: var(--surface);
 }
 .reading-correction-slot {
   grid-area: correction;
@@ -1568,6 +1568,17 @@ a {
   color: var(--faint);
   font-size: 0.6875rem;
   text-align: right;
+}
+
+.reading-discussion-empty {
+  min-height: 100%;
+}
+.reading-discussion-empty h1 {
+  font-size: 1.5rem;
+}
+.reading-discussion-composer {
+  margin: 0 12px 12px;
+  flex-shrink: 0;
 }
 .reading-correction-form {
   margin: 0 13px 13px;
@@ -2635,6 +2646,18 @@ details[open] > summary .disclosure {
   min-height: 34px;
   padding: 8px 0;
   font-size: 1rem;
+}
+.agent-answer > .working-indicator,
+.message.assistant > .working-indicator {
+  padding-top: 0;
+  margin-bottom: 12px;
+}
+.working-indicator.ruled {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 16px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--line);
 }
 .activity-time {
   font-size: 0.875rem;

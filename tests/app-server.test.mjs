@@ -51,9 +51,13 @@ test("reasoning items, summaries and raw reasoning stay out of the transcript", 
     }),
     [],
   );
-  assert.deepEqual(events.map("item/started", {
+  const started = events.map("item/started", {
     item: { id: "r1", type: "reasoning", summary: [] },
-  }), []);
+  });
+  assert.deepEqual(started, [{
+    type: "item.started",
+    item: { id: "activity:r1", type: "agent_activity", phase: "thinking" },
+  }]);
   assert.deepEqual(events.map("item/reasoning/summaryTextDelta", {
     itemId: "r1",
     summaryIndex: 0,
@@ -73,8 +77,9 @@ test("reasoning items, summaries and raw reasoning stay out of the transcript", 
       content: ["private reasoning"],
     },
   });
-  assert.deepEqual(done, []);
+  assert.deepEqual(done, [{ type: "item.completed", item: started[0].item }]);
   assert.ok(!JSON.stringify(done).includes("private reasoning"));
+  assert.ok(!JSON.stringify(done).includes("公开摘要"));
 });
 
 test("native context metrics and compaction are reported without invented limits", () => {
@@ -121,8 +126,8 @@ test("native context metrics and compaction are reported without invented limits
   );
 });
 
-test("reading retains thinking lifecycle without retaining any reasoning or summaries", () => {
-  const events = new runtime.AppServerEvents("reading-turn", true, true);
+test("chats retain thinking lifecycle without retaining any reasoning or summaries", () => {
+  const events = new runtime.AppServerEvents("reading-turn", true);
   const raw = { id: "thought-1", type: "reasoning", summary: ["private summary"], content: ["private reasoning"] };
   const start = events.map("item/started", { turnId: "reading-turn", item: raw });
   assert.deepEqual(start, [{ type: "item.started", item: { id: "activity:thought-1", type: "agent_activity", phase: "thinking" } }]);
@@ -132,7 +137,9 @@ test("reading retains thinking lifecycle without retaining any reasoning or summ
   assert.deepEqual(end, [{ type: "item.completed", item: start[0].item }]);
   assert.ok(!JSON.stringify([...start, ...end]).includes("private"));
   assert.deepEqual(events.map("item/started", { turnId: "older-turn", item: raw }), []);
-  assert.deepEqual(new runtime.AppServerEvents().map("item/started", { item: raw }), []);
+  const plain = new runtime.AppServerEvents().map("item/started", { item: raw });
+  assert.deepEqual(plain, [{ type: "item.started", item: { id: "activity:thought-1", type: "agent_activity", phase: "thinking" } }]);
+  assert.ok(!JSON.stringify(plain).includes("private"));
 });
 
 test("failed native turns are failures and command streams retain their exit result", () => {

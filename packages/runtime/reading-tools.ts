@@ -1,6 +1,6 @@
 import type { AgentInput } from "./index";
 import type { NativeToolRegistry } from "./visual-design";
-import { nextReadingPhases, parseReadingProgress, type ReadingProgress } from "../contracts/reading-workflow";
+import { isReadingDiscussionPrompt, nextReadingPhases, parseReadingProgress, type ReadingProgress } from "../contracts/reading-workflow";
 
 export function readingWebSearchMode(input: Pick<AgentInput, "stageId" | "settings">): "live" | "disabled" {
   return input.stageId === "reading" && input.settings.network ? "live" : "disabled";
@@ -23,7 +23,8 @@ export function createReadingTools(input: AgentInput): NativeToolRegistry | unde
     async call(namespace, tool, args) {
       const progress = parseReadingProgress(args);
       let error = "";
-      if (closed || input.signal.aborted) error = "研读任务已停止。";
+      if (isReadingDiscussionPrompt(input.prompt)) error = "当前是研读完成后的讨论，不能上报或重开研读阶段。不要再次调用本工具，请直接用文字回应。";
+      else if (closed || input.signal.aborted) error = "研读任务已停止。";
       else if (namespace !== "nexiom_reading" || tool !== "set_reading_stage" || !progress) error = "无效的研读阶段事件。";
       else {
         const prior = steps.get(progress.stepId);
