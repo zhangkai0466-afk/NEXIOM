@@ -120,7 +120,7 @@ export const commandSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("workflow.read"), projectId: z.string().uuid() }),
   z.object({ type: z.literal("workflow.update"), projectId: z.string().uuid(), change: workflowActionSchema }),
   z.object({ type: z.literal("project.archive"), projectId: z.string().uuid(), archived: z.boolean() }),
-  z.object({ type: z.literal("pdf.save"), projectId: z.string().uuid(), name: z.string().min(1).max(200), base64: z.string().min(1).max(40000000) }),
+  z.object({ type: z.literal("pdf.save"), projectId: z.string().uuid(), path: z.string().min(1).max(2000), base64: z.string().min(1).max(40000000) }),
   z.object({ type: z.literal("snapshot") }),
   z.object({ type: z.literal("usage.export") }),
   z.object({ type: z.literal("usage.import"), data: z.string().max(16 * 1024 * 1024) }),

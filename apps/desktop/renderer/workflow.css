@@ -9,7 +9,8 @@
 .workflow-actions { display:flex; flex-wrap:wrap; align-items:center; gap:10px; margin:20px 0; }
 .workflow-discussion { margin:24px 0; padding:20px; border:1px solid var(--border); border-radius:16px; background:var(--surface); }
 .workflow-discussion label { display:block; font-weight:600; margin-bottom:12px; }
-.workflow-discussion textarea { width:100%; min-height:100px; resize:vertical; border:0; background:transparent; color:inherit; font:inherit; line-height:1.7; outline:none; }
+.workflow-discussion textarea { display:block; width:100%; min-height:100px; padding:12px 14px; margin:0 0 14px; resize:vertical; border:1px solid var(--border); border-radius:10px; background:var(--surface); color:inherit; font:inherit; line-height:1.7; outline:none; transition:border-color 140ms ease; }
+.workflow-discussion textarea:focus-visible { outline:none; border-color:color-mix(in srgb,var(--link) 65%,var(--strong-border)); box-shadow:none; }
 .workflow-result { margin-top:30px; }
 .workflow-result-heading { display:flex; align-items:center; justify-content:space-between; gap:20px; }
 .workflow-result-heading span { font-size:12px; color:var(--muted); }
@@ -25,7 +26,9 @@
 .reading-checklist { width:100%; border-collapse:collapse; }.reading-checklist td,.reading-checklist th { text-align:left; padding:14px; border-bottom:1px solid var(--border); vertical-align:top; }
 .reading-checklist input { width:18px; height:18px; }.reading-checklist .markdown p { margin:0; }
 .reading-annotation { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:30px; margin:24px 0; }
-.reading-annotation blockquote { padding:16px; margin:0; border-left:3px solid #dba743; background:#dba74312; line-height:1.9; }
+/* Source quotations use the reading dimension color, not an activity or warning color. */
+.reading-annotation blockquote { padding:16px; margin:0; border-left:3px solid var(--dimension-reading); background:color-mix(in srgb,var(--dimension-reading) 7%,transparent); line-height:1.9; }
+.reading-report-body .markdown blockquote { border-left-color:var(--dimension-reading); }
 .reading-annotation aside { border-left:1px solid var(--border); padding-left:20px; position:relative; }
 .reading-annotation aside:before { content:""; position:absolute; width:20px; left:-20px; top:25px; border-top:1px solid var(--border); }
 .reading-risk { margin:24px 0; padding:0 0 20px; border-bottom:1px solid var(--border); }.reading-risk h3 { font-size:20px; }.reading-risk[data-level="严重"] h3 { color:#df685f; }.reading-risk[data-level="中等"] h3 { color:#c79436; }

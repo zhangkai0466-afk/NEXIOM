@@ -241,8 +241,8 @@ export function ModelingSidebar({ projects, project, threads, casualThreads = []
       return;
     }
     const bounds = anchor.getBoundingClientRect();
-    const menuWidth = 326;
-    const menuHeight = 414;
+    const menuWidth = 270;
+    const menuHeight = 304;
     const margin = 8;
     const left = Math.max(margin, Math.min(point?.x ?? bounds.right + 5, window.innerWidth - menuWidth - margin));
     const candidateTop = point?.y ?? bounds.top;

@@ -74,6 +74,12 @@ export function PdfViewer({ base64, title, className = "", onClose, onQuote, onS
   const container = useRef<HTMLDivElement>(null);
   const viewerElement = useRef<HTMLDivElement>(null);
   const session = useRef<PdfSession | null>(null);
+  const savedBase64 = useRef<string | null>(null);
+  const [documentBase64, setDocumentBase64] = useState(base64);
+  // Updating the parent's saved cache must not reset the current page or undo stack.
+  useEffect(() => {
+    if (base64 !== savedBase64.current) setDocumentBase64(base64);
+  }, [base64]);
   const searchInput = useRef<HTMLInputElement>(null);
   const [pdf, setPdf] = useState<PDFDocumentProxy | null>(null);
   const [error, setError] = useState("");
@@ -148,7 +154,7 @@ export function PdfViewer({ base64, title, className = "", onClose, onQuote, onS
     root.current?.addEventListener("wheel", wheel, { passive: false, signal: abort.signal });
     let task: ReturnType<typeof getDocument> | undefined;
     try {
-      const binary = atob(base64);
+      const binary = atob(documentBase64);
       task = getDocument({ data: Uint8Array.from(binary, char => char.charCodeAt(0)), BinaryDataFactory: PdfBinaryDataFactory, useWorkerFetch: false, useWasm: false });
       void task.promise.then(async document => {
         if (disposed) return;
@@ -164,7 +170,7 @@ export function PdfViewer({ base64, title, className = "", onClose, onQuote, onS
       viewer.setDocument(null as unknown as PDFDocumentProxy); link.setDocument(null);
       void task?.destroy();
     };
-  }, [base64]);
+  }, [documentBase64]);
 
   useEffect(() => {
     const update = () => setFullscreen(document.fullscreenElement === root.current);
@@ -187,18 +193,45 @@ export function PdfViewer({ base64, title, className = "", onClose, onQuote, onS
     try { session.current.viewer.annotationEditorMode = { mode }; setEditor(mode); }
     catch { setNotice("此 PDF 暂不支持批注。"); }
   }
-  async function download(save = false) {
+  async function saveChanges() {
+    if (onSave) await persistPdf(onSave);
+  }
+  async function download() {
+    await persistPdf();
+  }
+  async function persistPdf(save?: (base64: string) => Promise<void>) {
     const current = session.current;
     if (!current?.document) return;
     setSaving(true); setNotice("");
     try {
-      current.viewer.annotationEditorMode = { mode: AnnotationEditorType.NONE };
+      // PDF.js's getter returns a number; its published type mirrors the setter object.
+      if (![AnnotationEditorType.NONE, AnnotationEditorType.DISABLE].includes(Number(current.viewer.annotationEditorMode))) {
+        // Mode changes commit the active editor asynchronously. Serialize only
+        // after PDF.js has finished, including a pending deletion or drawing.
+        await new Promise<void>((resolve, reject) => {
+          const abort = new AbortController();
+          const timer = window.setTimeout(() => { abort.abort(); reject(new Error("批注尚未完成，请稍后重试。")); }, 10000);
+          current.bus.on("annotationeditormodechanged", ({ mode }: { mode: number }) => {
+            if (mode !== AnnotationEditorType.NONE) return;
+            clearTimeout(timer); abort.abort(); resolve();
+          }, { signal: abort.signal });
+          try { current.viewer.annotationEditorMode = { mode: AnnotationEditorType.NONE }; }
+          catch (error) { clearTimeout(timer); abort.abort(); reject(error); }
+        });
+      }
+      if (session.current !== current) return;
       const bytes = await current.document.saveDocument();
       if (session.current !== current) return;
-      if (save && onSave) {
+      if (save) {
         let binary = "";
         for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
-        await onSave(btoa(binary)); setNotice("批注 PDF 已保存到项目。"); return;
+        const saved = btoa(binary);
+        const previous = savedBase64.current;
+        savedBase64.current = saved;
+        try { await save(saved); }
+        catch (error) { savedBase64.current = previous; throw error; }
+        if (session.current === current) setNotice("修改已保存。");
+        return;
       }
       const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
       const anchor = document.createElement("a"); anchor.href = url;
@@ -221,7 +254,7 @@ export function PdfViewer({ base64, title, className = "", onClose, onQuote, onS
     </div>}
     <div className="nexiom-pdf-toolbar" role="toolbar" aria-label="PDF 查看工具">
       <div className="nexiom-pdf-tools-left">
-        {onSave && button("保存批注到项目", saving ? <LoaderCircle size={17} /> : <Save size={17} />, () => void download(true), !pdf || saving)}
+        {onSave && button("保存修改", saving ? <LoaderCircle className="spin" size={17} /> : <Save size={17} />, () => void saveChanges(), !pdf || saving)}
         <div className="nexiom-pdf-group">
         {button("文档目录", <List size={17} />, () => setSide(side === "outline" ? null : "outline"), !pdf, side === "outline")}
         {button("页面缩略图", <PanelLeft size={17} />, () => setSide(side === "pages" ? null : "pages"), !pdf, side === "pages")}
@@ -267,7 +300,7 @@ export function PdfViewer({ base64, title, className = "", onClose, onQuote, onS
       <label><input type="checkbox" checked={caseSensitive} onChange={event => setCaseSensitive(event.target.checked)} />区分大小写</label>
       {button("关闭搜索", <X size={16} />, () => { setFinding(false); session.current?.bus.dispatch("findbarclose", { source: root.current }); }, false)}
     </div>}
-    {notice && <div className="nexiom-pdf-notice" data-success={notice === "批注 PDF 已保存到项目。"} role="status">{notice}</div>}
+    {notice && <div className="nexiom-pdf-notice" data-success={notice === "修改已保存。"} role="status">{notice}</div>}
     <div className="nexiom-pdf-body">
       {side && <aside className="nexiom-pdf-sidebar" aria-label={side === "pages" ? "页面缩略图" : "文档目录"}>
         {side === "pages" && pdf && Array.from({ length: pdf.numPages }, (_, index) => <Thumbnail key={index} pdf={pdf} number={index + 1} active={pageNumber === index + 1} onSelect={() => goToPage(index + 1)} />)}

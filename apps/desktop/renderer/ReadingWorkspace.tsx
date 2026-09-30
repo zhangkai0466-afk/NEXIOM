@@ -20,8 +20,6 @@ import {
   ListChecks,
   MessageSquareText,
   Network,
-  PanelRightClose,
-  PanelRightOpen,
   ArrowUp,
   Square,
   Tags,
@@ -30,6 +28,8 @@ import {
 import type { AgentItem, FileContent, Message, ProjectFile, Run } from "../../../packages/contracts";
 import { RichText } from "./AgentOutput";
 import { PdfViewer } from "./PdfViewer";
+import { PanelToggleIcon } from "./PanelToggleIcon";
+import { ReadingOutlineDivider } from "./ReadingOutlineDivider";
 import { ReadingSectionBody } from "./ReadingSections";
 import { request } from "./bridge";
 import type { WorkflowAction, WorkflowState } from "../../../packages/contracts/workflow";
@@ -340,6 +340,10 @@ export function ReadingWorkspace({
     [messages, agentItems, readingStartSequence],
   );
   const [activeSection, setActiveSection] = useState("");
+  const [outlineOpen, setOutlineOpen] = useState(() => readPreference("nexiom.readingOutlineOpen") !== "false");
+  const [outlineWidth, setOutlineWidth] = useState(() => Math.min(360, Math.max(180, Number(readPreference("nexiom.readingOutlineWidth")) || 230)));
+  const [outlineMax, setOutlineMax] = useState(360);
+  const [resizingOutline, setResizingOutline] = useState(false);
   const [correctionOpen, setCorrectionOpen] = useState(() => window.innerWidth >= 1180);
   const [correctionWidth, setCorrectionWidth] = useState(initialCorrectionWidth);
   const [correctionMax, setCorrectionMax] = useState(READING_CORRECTION_MAX);
@@ -383,12 +387,16 @@ export function ReadingWorkspace({
     const measure = () => {
       const outline = grid.querySelector<HTMLElement>(".reading-outline");
       const outlineWidth = outline && getComputedStyle(outline).display !== "flex" ? outline.offsetWidth : 0;
-      setCorrectionMax(Math.min(READING_CORRECTION_MAX, Math.max(READING_CORRECTION_MIN, grid.clientWidth - outlineWidth - 368)));
+      setCorrectionMax(Math.min(READING_CORRECTION_MAX, Math.max(READING_CORRECTION_MIN, grid.clientWidth - outlineWidth - 376)));
+      setOutlineMax(Math.min(360, Math.max(180, grid.clientWidth - (correctionOpen ? READING_CORRECTION_MIN : 0) - 376)));
     };
     const observer = new ResizeObserver(measure);
-    observer.observe(grid); measure();
+    observer.observe(grid);
+    const outline = grid.querySelector<HTMLElement>(".reading-outline");
+    if (outline) observer.observe(outline);
+    measure();
     return () => observer.disconnect();
-  }, [!!report, !!activeRun, restarting, animatedRunId]);
+  }, [!!report, !!activeRun, restarting, animatedRunId, outlineWidth, outlineOpen, correctionOpen]);
 
   useEffect(() => {
     if (activeRun && !discussing) setViewingReport(false);
@@ -639,13 +647,13 @@ export function ReadingWorkspace({
 
   return (
     <section
-      className={`reading-workspace ${correctionOpen ? "" : "correction-closed"} ${resizingCorrection ? "correction-resizing" : ""}`}
-      style={{ "--reading-correction-width": `${displayedCorrectionWidth}px` } as CSSProperties}
+      className={`reading-workspace ${correctionOpen ? "" : "correction-closed"} ${outlineOpen ? "" : "outline-closed"} ${resizingCorrection || resizingOutline ? "correction-resizing" : ""}`}
+      style={{ "--reading-correction-width": `${displayedCorrectionWidth}px`, "--reading-outline-width": `${Math.min(outlineWidth, outlineMax)}px` } as CSSProperties}
     >
       <header className="reading-report-header">
         <WorkspaceHeading dimension="reading" projectName={projectName} title="赛题研读报告" detail={discussing ? "正在讨论当前板块，已发布报告保持不变" : activeRun ? "正在根据新的信息更新报告" : `已整理 ${sections.length} 个研读板块`}/>
         <div className="reading-report-actions">
-          {runOutcome && !discussionTurn && <AgentTaskStatus kind={currentTaskKind} status={runOutcome} compact final />}
+          {runOutcome && runOutcome !== "completed" && !discussionTurn && <AgentTaskStatus kind={currentTaskKind} status={runOutcome} compact final />}
           {activeRun && !discussing && <button type="button" className="secondary-button" onClick={() => setViewingReport(false)}><ArrowLeft size={15} />返回进度</button>}
           <button
             type="button"
@@ -666,14 +674,14 @@ export function ReadingWorkspace({
             aria-controls="reading-correction-panel"
             onClick={() => correctionOpen ? closeCorrection() : setCorrectionOpen(true)}
           >
-            {correctionOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
+            <PanelToggleIcon expanded={correctionOpen} />
             {selectedSource ? "聊聊原题" : "人工纠偏"}
             {!!targetTurns.length && <span className="reading-correction-count">{targetTurns.length}</span>}
           </button>
         </div>
       </header>
       <div className="reading-workspace-grid" ref={workspaceGrid}>
-        <nav className="reading-outline" aria-label="研读报告目录">
+        <nav id="reading-report-outline" className="reading-outline" aria-label="研读报告目录" inert={!outlineOpen} aria-hidden={!outlineOpen}>
           {!!pdfFiles.length && <span className="reading-outline-label">原题文件</span>}
           {pdfFiles.map((file) => (
             <button
@@ -704,6 +712,14 @@ export function ReadingWorkspace({
             </button>
           ))}
         </nav>
+        <ReadingOutlineDivider width={outlineOpen ? Math.min(outlineWidth, outlineMax) : 0} restoreWidth={Math.min(outlineWidth, outlineMax)} max={outlineMax}
+          onChange={width => { setResizingOutline(true); setOutlineOpen(width > 0); if (width) setOutlineWidth(width); }}
+          onCommit={width => {
+            setResizingOutline(false); setOutlineOpen(width > 0);
+            writePreference("nexiom.readingOutlineOpen", String(width > 0));
+            if (width) { setOutlineWidth(width); writePreference("nexiom.readingOutlineWidth", String(width)); }
+            else setOutlineWidth(Math.min(360, Math.max(180, Number(readPreference("nexiom.readingOutlineWidth")) || 230)));
+          }} />
         <article className={`reading-report-body ${selectedSource ? "pdf-active" : ""}`} aria-live="polite">
           {workflowError && <p role="alert" className="form-error">{workflowError}</p>}
           {selectedSource ? (
@@ -717,7 +733,11 @@ export function ReadingWorkspace({
                   className="reading-pdf-viewer"
                   base64={pdfContents[selectedSource.path]}
                   title={selectedSource.name}
-                  onSave={async base64 => { await request({ type: "pdf.save", projectId, name: selectedSource.name, base64 }); }}
+                  onSave={async base64 => {
+                    const path = selectedSource.path;
+                    await request({ type: "pdf.save", projectId, path, base64 });
+                    setPdfContents(current => ({ ...current, [path]: base64 }));
+                  }}
                   onQuote={quote => { if (!correctionTarget) return; setCorrectionOpen(true); setCorrectionDrafts(current => ({ ...current, [correctionTarget.id]: (current[correctionTarget.id] ?? "") + quote })); requestAnimationFrame(() => correctionPanel.current?.querySelector("textarea")?.focus()); }}
                 />
               ) : null}

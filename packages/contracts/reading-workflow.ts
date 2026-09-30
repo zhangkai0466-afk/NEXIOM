@@ -1,4 +1,4 @@
-export const READING_WORKFLOW_VERSION = "reading-research-v5";
+export const READING_WORKFLOW_VERSION = "reading-research-v6";
 export const READING_PHASES = ["reading", "analyzing", "thinking", "searching", "planning", "executing", "writing"] as const;
 export type ReadingPhase = typeof READING_PHASES[number];
 export interface ReadingProgress {
@@ -28,7 +28,14 @@ export function nextReadingPhases(completed: ReadingProgress[], network: boolean
   return [];
 }
 
-export const readingReportStructure = `报告以人类读者快速准确理解题目为目标，使用直白、生动且有依据的中文，不用术语堆叠。下列二级标题保持一致，问题1至问题N按真实小问数量展开，不把例子算作问题。
+export const readingScopeInstructions = `【赛题研读范围硬性规则】
+赛题 PDF 中的赛事抬头与格式通知“2026年高教社杯全国大学生数学建模竞赛题目（请先阅读"全国大学生数学建模竞赛论文格式规范"）”不属于研读范围。遇到同一通知的换行、空格、全角/半角括号、中文/英文引号差异或年份变化，按相同规则处理。
+在所有研读报告板块中直接跳过这段文字：不摘录、不放入原句引用块、不逐字句解读、不生成批注，不把它列为术语、约束、陷阱、待核对事项或交付要求；也不要另写“此句是通用通知，与题意无关”的解释。不因这句通知去读取或检索论文格式规范。
+若 PDF 提取把该通知与后面的实际题名合并到同一行或同一段，只剔除赛事抬头与格式通知，必须保留紧随其后的题号、题名及实质正文。例如后接“C题 微网与外部电网电力调控策略”时，从“C题”开始引用并正常分析。
+“完整阅读原题”和“逐字保留原句”均仅适用于上述排除后的实质题面；不得因此删掉真正的题目要求、附录、公式、图表或题面明确给出的交付要求。编写完成前检查引用块和批注，移除误收录的赛事抬头与格式通知。`;
+
+export const readingReportStructure = `${readingScopeInstructions}
+报告以人类读者快速准确理解题目为目标，使用直白、生动且有依据的中文，不用术语堆叠。下列二级标题保持一致，问题1至问题N按真实小问数量展开，不把例子算作问题。
 # 赛题研读报告
 ## 赛题概览
 用大白话讲清题目关于什么、问了什么、需要解决什么、最后交付什么。跳过“请先阅读论文格式规范”之类与题意无关的开场通知，不丢弃实际交付要求。
@@ -49,7 +56,8 @@ export const readingReportStructure = `报告以人类读者快速准确理解�
 ## 交付清单
 只列题面明确要求的完整交付物；一般代码和支撑材料总控在项目总览。长段解释不用表格，表格只做简短横向对照。`;
 
-export const readingWorkflowInstructions = `正式研读遵守明确的工作界限：思考（可选）→阅读→分析→思考复核→按需检索→思考核验→编写。开始时可以直接阅读；只有实际需要理解研读任务、确认文件或选择读取方式时才开始起始思考。起始思考尚未取得题面依据，不能代替题意分析。首个实质性研读工作必须是完整阅读原题，首次阅读前不得分析题意或检索。没有关键歧义或未允许联网时跳过检索及其后专门的核验环节，不能伪造经历或补出未发生的阶段；完成必要复核前不得编写。人工纠偏不在本流程内：它发生在整份报告完成之后，是对已发布内容的讨论，不得借纠偏重开阶段或重出整份报告。
+export const readingWorkflowInstructions = `${readingScopeInstructions}
+正式研读遵守明确的工作界限：思考（可选）→阅读→分析→思考复核→按需检索→思考核验→编写。开始时可以直接阅读；只有实际需要理解研读任务、确认文件或选择读取方式时才开始起始思考。起始思考尚未取得题面依据，不能代替题意分析。首个实质性研读工作必须是完整阅读原题，首次阅读前不得分析题意或检索。没有关键歧义或未允许联网时跳过检索及其后专门的核验环节，不能伪造经历或补出未发生的阶段；完成必要复核前不得编写。人工纠偏不在本流程内：它发生在整份报告完成之后，是对已发布内容的讨论，不得借纠偏重开阶段或重出整份报告。
 对外主链按工作目标汇总为 4～7 个节点；起始思考和检索后的思考都只显示为“思考”，不另造“准备”或“研读”动作。这个数量只约束展示，不限制实际读取、思考和检索的次数，也不能成为提前结束工作的理由。每个阶段是一段有明确目标和完成条件的工作，不是一次模型回复、工具调用、文件分页或短暂思考。分批读文件、逐问分析、多轮搜索、多来源阅读、比较及回看题面应在所属工作环节内完成，不因这些小动作新建阶段。查证围绕具体疑点反复进行，界面将多轮查证汇总在同一组检索/核验节点中。
 研读以帮助理解题意与证据为主，仅在每问的“理解阶段的初步分析与建模小思”给出2—3条基础建模意见，不执行正式建模或求解，不把建议当作确定事实。术语口径可以给出有据的语义推荐，最终由人选择；不得借术语解释推介模型或解法。
 长段解释直接用正文，表格只用于必要且简短的横向对照，不能把文献论证挤入多列表格。
@@ -154,7 +162,7 @@ export const readingDiscussionInstructions = `当前回合是赛题研读完成�
 回复长短要和用户的话相称。不能盲目迎合，也不要擅自替人选定有争议的口径。不要寒暄式重开研读，不要复述整份报告。若需要核对某一处原文或已引用依据，只针对当前问题核对，核对后回到讨论。`;
 
 export function readingDeveloperInstructions(prompt: string, network: boolean) {
-  if (isReadingDiscussionPrompt(prompt)) return `\n\n${readingDiscussionInstructions}\n${readingResearchInstructions}`;
+  if (isReadingDiscussionPrompt(prompt)) return `\n\n${readingScopeInstructions}\n${readingDiscussionInstructions}\n${readingResearchInstructions}`;
   const access = network
     ? "已允许，使用 web_search 实际检索并核对原文。如果供应商不支持或检索失败，报告限制，不伪造结果。"
     : "未允许。不得绕过联网设置；将需要的来源和查询词列为待核对，不得声称已完成文献核验。";

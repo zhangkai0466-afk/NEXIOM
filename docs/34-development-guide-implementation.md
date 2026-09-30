@@ -17,7 +17,7 @@
 | 长按头像 | 新设置的头像同时保存原始图片与裁剪图片，长按可查看原图；历史账户没有原图时显示已有头像 | AccountSettings、AvatarPreview |
 | 终端、插件、工作树 | 项目命令会话、插件资料导入与启停、Git 状态与提交记录、创建独立工作树 | ProjectTools、project-tools |
 | 归档项目、归档聊天 | 项目可归档/恢复；保留既有聊天归档入口 | ModelingSidebar、service |
-| PDF 保存与选中文字讨论 | PDF.js 批注另存进项目；选择文字后“在对话中聊聊”加入当前原题讨论草稿，仍需点击发送 | PdfViewer、ReadingWorkspace |
+| PDF 保存与选中文字讨论 | “保存修改”将批注改动写回项目内当前 PDF，包含删除高亮；下载为独立操作；选择文字后“在对话中聊聊”加入当前原题讨论草稿，仍需点击发送 | PdfViewer、ReadingWorkspace |
 | 研读报告结构 | 固定概览、逐句、术语、逐问八小节、依赖、分级风险、核对、文献和交付结构；修复中文相邻加粗 | reading-workflow、markdown-repair |
 | 原句与批注 | 报告中原句放在左侧，解读放在右侧并以连接线关联，保留页码文字；原 PDF 可另行查看和手动标注 | ReadingSections |
 | 通用术语识别 | 要求完整扫描题干、小问、附录与复合名词，不内置固定赛题术语库；证据不足时记录待核实 | reading-workflow |
@@ -41,7 +41,7 @@
   .nexiom/workflow.json                 工作流状态、版本、核对项和依赖决定
   .nexiom/plugins.json                  启用的项目插件与资料
   reading/赛题研读报告.md
-  reading/annotations/                 带批注的 PDF 副本
+  inputs/*.pdf                        原题及已保存的手动批注修改
   reading/research/                    分类研究记录
   attachments/reports/                 逐附件分析报告
   modeling/shared/                     各问共享进展与依赖决定

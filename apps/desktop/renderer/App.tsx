@@ -67,6 +67,7 @@ import { ProjectTools } from "./ProjectTools";
 import { ModelWorkflowWorkspace } from "./ModelWorkflowWorkspace";
 import { WorkspaceLogo } from "./WorkspaceLogo";
 import { WorkspaceHeading } from "./WorkspaceHeading";
+import { QuestionPicker } from "./QuestionPicker";
 import { NexiomMark } from "./NexiomMark";
 import { VisualizationIcon } from "./VisualizationIcon";
 import {
@@ -1381,7 +1382,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
           )}
           <section
             ref={scrollRef}
-            className={`conversation-scroll ${showStructuredWorkspace ? "reading-scroll" : ""}`}
+            className={`conversation-scroll ${showStructuredWorkspace ? "reading-scroll" : ""} ${showProjectOverview ? "project-overview-scroll" : ""}`}
             aria-label={showProjectOverview ? "项目总览" : showVisualLibrary ? "可视化工作台" : showReadingWorkspace ? "赛题研读工作台" : showAttachmentWorkspace ? "附件分析工作台" : view === "conversation" ? "会话内容" : "执行记录"}
             onWheel={(event) => {
               if (event.deltaY < 0) {
@@ -1872,10 +1873,9 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
           </Modal>
         )}
         {newThread && (
-          <Modal title={`${dimensionName(newThread.stageId)} · 添加对话`} onClose={() => { if (!busy) setNewThread(null); }}>
-            <form className="modal-form" onSubmit={createThread}>
-              <label>问题<input autoFocus list="modeling-question-options" value={questionName} onChange={(event) => setQuestionName(event.target.value)} required maxLength={80} disabled={busy} /></label>
-              <datalist id="modeling-question-options">{snapshot.questions.filter((item) => item.projectId === newThread.projectId).map((item) => <option key={item.id} value={item.name} />)}</datalist>
+          <Modal title={`${dimensionName(newThread.stageId)} · 添加对话`} className="thread-create-modal" onClose={() => { if (!busy) setNewThread(null); }}>
+            <form className="modal-form thread-create-form" onSubmit={createThread}>
+              <QuestionPicker value={questionName} onChange={setQuestionName} options={snapshot.questions.filter(item => item.projectId === newThread.projectId).map(item => item.name)} disabled={busy}/>
               <label>对话名称<input value={threadName} onChange={(event) => setThreadName(event.target.value)} placeholder={questionName.trim()} maxLength={80} disabled={busy} /></label>
               {error && <p className="form-error" role="alert">{error}</p>}
               <footer><button type="button" className="secondary-button" disabled={busy} onClick={() => setNewThread(null)}>取消</button><button className="primary-button" disabled={busy || !questionName.trim()}>{busy && <LoaderCircle size={15} className="spin" />}添加对话</button></footer>

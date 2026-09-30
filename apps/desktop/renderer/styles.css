@@ -127,12 +127,15 @@ button:disabled {
   cursor: not-allowed;
 }
 button:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
 select:focus-visible,
 summary:focus-visible {
   outline: 2px solid var(--link);
   outline-offset: 3px;
+}
+:where(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),textarea):focus-visible {
+  outline:none;
+  border-color:color-mix(in srgb,var(--link) 65%,var(--strong-border));
+  box-shadow:0 0 0 1px color-mix(in srgb,var(--link) 12%,transparent);
 }
 input,
 textarea {
@@ -1295,16 +1298,24 @@ a {
   min-height: 0;
   flex: 1;
   display: grid;
-  grid-template-columns: 230px minmax(0, 1fr) 8px var(--reading-correction-width, 360px);
-  grid-template-areas: "outline report resizer correction";
+  grid-template-columns: var(--reading-outline-width, 230px) 8px minmax(0, 1fr) 8px var(--reading-correction-width, 360px);
+  grid-template-areas: "outline outline-resizer report resizer correction";
   overflow: hidden;
   transition: grid-template-columns 260ms cubic-bezier(.22,1,.36,1);
 }
 .reading-workspace.correction-resizing .reading-workspace-grid { transition: none; }
 .reading-workspace.correction-closed .reading-workspace-grid {
-  grid-template-columns: 230px minmax(0, 1fr) 0 0;
-  grid-template-areas: "outline report resizer correction";
+  grid-template-columns: var(--reading-outline-width, 230px) 8px minmax(0, 1fr) 0 0;
+  grid-template-areas: "outline outline-resizer report resizer correction";
 }
+.reading-outline-resizer { grid-area: outline-resizer; min-width: 0; position: relative; cursor: col-resize; touch-action: none; background: var(--surface); }
+.reading-outline-resizer::after { content: ""; position: absolute; width: 2px; height: 44px; left: 3px; top: calc(50% - 22px); border-radius: 2px; background: var(--strong-border); }
+.reading-outline-resizer:hover::after,
+.reading-outline-resizer:focus-visible::after { background: var(--dimension-reading); }
+.reading-outline-resizer:focus-visible { outline: none; box-shadow: inset 0 0 0 1px var(--dimension-reading); }
+.reading-workspace.outline-closed .reading-outline { display: none; }
+.reading-workspace.outline-closed .reading-workspace-grid { grid-template-columns: 0 8px minmax(0, 1fr) 8px var(--reading-correction-width, 360px); }
+.reading-workspace.outline-closed.correction-closed .reading-workspace-grid { grid-template-columns: 0 8px minmax(0, 1fr) 0 0; }
 .reading-outline {
   grid-area: outline;
   min-width: 0;
@@ -3524,6 +3535,9 @@ input[type="checkbox"] {
   }
 }
 @media (max-width: 1180px) {
+  .reading-outline-resizer { position: absolute; z-index: 2; grid-area: auto; left: 0; top: 8px; width: 8px; height: 44px; }
+  .reading-workspace.outline-closed .reading-workspace-grid { grid-template-columns: minmax(0, 1fr) 8px var(--reading-correction-width, 340px); }
+  .reading-workspace.outline-closed.correction-closed .reading-workspace-grid { grid-template-columns: minmax(0, 1fr) 0 0; }
   .reading-workspace-grid {
     grid-template-columns: minmax(0, 1fr) 8px var(--reading-correction-width, 340px);
     grid-template-rows: auto minmax(0, 1fr);
@@ -4688,8 +4702,9 @@ input[type="checkbox"] {
 .chrome-submenu { position:absolute; left:calc(100% + 4px); top:-4px; min-width:140px; }
 .sidebar-toggle-icon path { transition:transform 220ms ease, opacity 220ms ease; transform-origin:center; }
 .sidebar-toggle-icon:not(.expanded) path { transform:translateX(-3px) scaleY(.65); }
+:root[data-reduce-motion="true"] .sidebar-toggle-icon path { transition: none; }
 .modal .danger-button, .modal .secondary-button, .modal button { white-space:nowrap; flex-shrink:0; }
-.modal input:focus, .modal textarea:focus { outline:none; border-color:var(--link); box-shadow:0 0 0 1px var(--link), 0 0 10px color-mix(in srgb,var(--link) 18%,transparent); }
+.modal input:focus, .modal textarea:focus { outline:none; border-color:color-mix(in srgb,var(--link) 65%,var(--strong-border)); box-shadow:0 0 0 1px color-mix(in srgb,var(--link) 12%,transparent); }
 .reading-discussion-composer.composer, .compact-correction-form { display:flex; align-items:flex-end; gap:8px; padding:7px 9px 7px 13px; border-radius:20px; min-height:48px; }
 .reading-discussion-composer.composer textarea, .compact-correction-form textarea { flex:1; min-width:0; min-height:32px; height:32px; max-height:160px; padding:5px 0; font-size:14px; line-height:22px; resize:none; }
 .reading-discussion-composer .composer-toolbar { flex:0 0 auto; min-height:32px; padding:0; }

@@ -57,7 +57,7 @@ export function ModelWorkflowWorkspace({ project, snapshot, stage, selectedThrea
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
   const start = (task: "analysis" | "model" | "validation" | "revision") => question && void change({ action: "start", questionId: question.id, route, task, text: draft });
-  if (stage === "overview") return <section className="workflow-workspace">
+  if (stage === "overview") return <section className="workflow-workspace project-overview-workspace">
     <ProjectOverview project={project} snapshot={snapshot} workflow={state} onNavigate={(stage, threadId) => onNavigate?.(stage, threadId)} />
     {error && <p role="alert" className="form-error">{error}</p>}
     <details id="project-final-models" className="project-final-models"><summary>最终模型与交付核对 · {state?.questions.filter(q => q.selected).length ?? 0} / {state?.questions.length ?? 0} 问已确认</summary>

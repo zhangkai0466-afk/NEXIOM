@@ -137,13 +137,12 @@ test("guide workflow persists questions, separates review inputs, revisions, fee
   await assert.rejects(read(), /记录损坏/);
 });
 
-test("PDF saves preserve inputs; terminal sessions are project scoped; plugins reach modeling but not validation", async t => {
+test("PDF saves update the current document; terminal sessions are project scoped; plugins reach modeling but not validation", async t => {
   const { core, project, read, update, settle, calls } = await setup(t);
-  const original = await readFile(path.join(project.root, "inputs/原题.pdf"));
-  const saved = await core.request({ type: "pdf.save", projectId: project.id, name: "原题.pdf", base64: Buffer.from("%PDF-1.7\nannotations").toString("base64") });
-  assert.match(saved.savedPath, /^reading\/annotations\//);
-  assert.deepEqual(await readFile(path.join(project.root, "inputs/原题.pdf")), original);
-  await assert.rejects(core.request({ type: "pdf.save", projectId: project.id, name: "evil.pdf", base64: Buffer.from("not pdf").toString("base64") }));
+  const saved = await core.request({ type: "pdf.save", projectId: project.id, path: "inputs/原题.pdf", base64: Buffer.from("%PDF-1.7\nannotations").toString("base64") });
+  assert.equal(saved.savedPath, "inputs/原题.pdf");
+  assert.equal(await readFile(path.join(project.root, "inputs/原题.pdf"), "utf8"), "%PDF-1.7\nannotations");
+  await assert.rejects(core.request({ type: "pdf.save", projectId: project.id, path: "inputs/原题.pdf", base64: Buffer.from("not pdf").toString("base64") }));
   const plugins = await core.request({ type: "plugins.install", projectId: project.id, manifest: JSON.stringify({ id: "model-notes", name: "基础模型库", description: "fixture", instructions: "PLUGIN_FIXTURE", documents: [] }) });
   assert.equal(plugins.plugins.length, 1);
   const questionId = (await read()).questions[0].id;

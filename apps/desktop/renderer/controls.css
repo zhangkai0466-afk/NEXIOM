@@ -1,4 +1,5 @@
 /* Shared controls retain native keyboard and screen-reader behavior. */
+.composer textarea:focus-visible, .reading-correction-form textarea:focus-visible, .settings-search input:focus-visible, .project-create-name input:focus-visible { box-shadow:none; }
 select { min-width:0; max-width:100%; min-height:34px; padding:6px 10px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--text); font-size:13px; line-height:20px; text-overflow:ellipsis; cursor:pointer; }
 select:disabled { opacity:.5; cursor:not-allowed; }
 select:not(:disabled):hover { border-color:var(--strong-border); }
@@ -17,7 +18,7 @@ select option { background:var(--panel); color:var(--text); }
 }
 .workflow-actions select { flex:0 1 auto; min-width:110px; }
 .workflow-discussion { transition:border-color 150ms,box-shadow 150ms; }
-.workflow-discussion:focus-within { border-color:var(--strong-border); box-shadow:0 0 0 2px color-mix(in srgb,var(--link) 9%,transparent); }
+.workflow-discussion:focus-within { border-color:var(--border); box-shadow:none; }
 .project-tools input:not([type="checkbox"]):not([type="file"]) { width:100%; min-height:36px; margin-top:7px; padding:8px 11px; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
 .project-tools input:focus-visible { outline:none; border-color:var(--link); }
 .project-tools pre { overflow:auto; max-width:100%; border-radius:8px; }.project-tools form>label { display:block; }

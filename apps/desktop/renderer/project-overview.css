@@ -1,3 +1,7 @@
+.conversation-scroll.project-overview-scroll { display:flex; flex-direction:column; }
+.workflow-workspace.project-overview-workspace { flex:0 0 auto; width:min(100%,1000px); margin:auto; padding:32px 40px; }
+.project-overview-workspace > .project-final-models { margin-bottom:0; }
+@media(max-width:760px) { .workflow-workspace.project-overview-workspace { padding:24px 20px; } }
 .project-monitor-header { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:0 0 26px; }
 .project-monitor-header>div { min-width:0; }
 .project-monitor-live { display:flex; align-items:center; gap:8px; flex-shrink:0; font-size:12px; color:var(--muted); }

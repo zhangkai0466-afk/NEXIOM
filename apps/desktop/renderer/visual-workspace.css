@@ -17,6 +17,8 @@
 .vws-icon { display: inline-grid; place-items: center; width: 2.25rem; height: 2.25rem; flex: 0 0 2.25rem; color: var(--muted); border-radius: 4px; padding: 0; }
 .vws-icon:hover:not(:disabled), .vws-icon.active { background: var(--hover); color: var(--text); }
 .vws-save { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 2.375rem; padding: 6px 12px; border-radius: 5px; background: var(--text); color: var(--surface); white-space: nowrap; }
+.vws .vws-save:hover:not(:disabled) { background:color-mix(in srgb,var(--text) 90%,var(--surface)); color:var(--surface); }
+.vws .vws-save:active:not(:disabled) { background:color-mix(in srgb,var(--text) 84%,var(--surface)); color:var(--surface); }
 .vws-save:disabled { opacity: .42; }
 .vws-body { flex: 1; min-height: 0; display: grid; grid-template-columns: 15rem minmax(180px, 1fr) 16.5rem; overflow-x: auto; overflow-y: hidden; }
 .vws-library, .vws-inspector { min-width: 0; min-height: 0; background: var(--panel); }

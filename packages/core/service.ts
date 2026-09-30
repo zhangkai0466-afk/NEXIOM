@@ -7,6 +7,8 @@ import {
   readFile,
   writeFile,
   realpath,
+  rename,
+  unlink,
 } from "node:fs/promises";
 import path from "node:path";
 import {
@@ -995,11 +997,18 @@ export class CoreService {
         const project = await this.projectWorkspace(command.projectId);
         const bytes = Buffer.from(command.base64, "base64");
         if (bytes.subarray(0, 5).toString() !== "%PDF-" || bytes.length > 30 * 1024 * 1024) throw new Error("无效或过大的 PDF。");
-        const name = path.basename(command.name).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/\.pdf$/i, "");
-        const relative = `reading/annotations/${name}-${Date.now()}-${randomUUID().slice(0, 6)}.pdf`;
-        const target = checkedFile(project.root, relative); mkdirSync(path.dirname(target), { recursive: true }); await writeFile(target, bytes, { flag: "wx" });
-        this.event(project.id, "pdf.saved", `已保存 PDF 批注：${relative}`); this.publish();
-        return { savedPath: relative };
+        const target = checkedFile(project.root, command.path);
+        if (path.extname(target).toLowerCase() !== ".pdf" || !(await lstat(target)).isFile()) throw new Error("只能保存当前项目中已有的 PDF。");
+        const temporary = `${target}.${randomUUID()}.tmp`;
+        try {
+          await writeFile(temporary, bytes, { flag: "wx", flush: true });
+          checkedFile(project.root, command.path);
+          await rename(temporary, target);
+        } finally {
+          await unlink(temporary).catch(error => { if (error.code !== "ENOENT") throw error; });
+        }
+        this.event(project.id, "pdf.saved", `已保存 PDF 修改：${command.path}`); this.publish();
+        return { savedPath: command.path };
       }
       case "project.create": {
         if (workspaceDriveEnforced() && command.name !== CASUAL_PROJECT_NAME)

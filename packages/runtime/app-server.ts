@@ -541,7 +541,7 @@ export async function* runAppServer(options: {
   input.signal.addEventListener("abort", abort, { once: true });
   try {
     await connection.request("initialize", {
-      clientInfo: { name: "nexiom", title: "NEXIOM", version: "0.7.7" },
+      clientInfo: { name: "nexiom", title: "NEXIOM", version: "0.7.11" },
       capabilities: { experimentalApi: true },
     });
     connection.notify("initialized");

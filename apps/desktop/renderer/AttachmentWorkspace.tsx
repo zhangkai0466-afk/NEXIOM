@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent } from "react";
-import { AlertTriangle, ArrowLeft, CheckCircle2, Circle, FileText, FileUp, MessageSquareText, PanelRightClose, PanelRightOpen, Paperclip, RotateCcw, Send, Square } from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Circle, FileText, FileUp, MessageSquareText, Paperclip, RotateCcw, Send, Square } from "lucide-react";
+import { PanelToggleIcon } from "./PanelToggleIcon";
 import type { AgentItem, Message, ProjectFile, Run } from "../../../packages/contracts";
 import { ATTACHMENT_TASK_MARKER, ATTACHMENT_CORRECTION_MARKER, attachmentTargets, type AttachmentTarget } from "../../../packages/contracts/attachment-workflow";
 import { RichText } from "./AgentOutput";
@@ -140,7 +141,7 @@ export function AttachmentWorkspace({
           {activeRun ? <button type="button" className="secondary-button" onClick={onCancel}><Square size={14} />停止分析</button>
             : <button type="button" className="secondary-button" onClick={() => setRestarting(true)} disabled={busy}><FileUp size={15} />导入新附件</button>}
           <button type="button" className={"secondary-button " + (correctionOpen ? "active" : "")} aria-expanded={correctionOpen} onClick={() => setCorrectionOpen(value => !value)}>
-            {correctionOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}人工纠偏
+            <PanelToggleIcon expanded={correctionOpen} />人工纠偏
           </button>
         </div>
       </header>

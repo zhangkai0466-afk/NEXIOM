@@ -12,6 +12,16 @@ const { readingSteps, readingProgressNotice, readingCanViewReport, latestFormalR
 const { readingWorkflowInstructions, readingReportStructure, readingDiscussionInstructions, readingDeveloperInstructions, buildReadingDiscussionPrompt, parseReadingDiscussion, readingDiscussionBounds, isReadingDiscussionSequence, latestReadingTurnIsDiscussion, READING_CORRECTION_MARKER } = await load("../packages/contracts/reading-workflow.ts");
 const { readingProseTables } = await load("../apps/desktop/renderer/reading-prose-tables.ts");
 const { getCurrentAgentTaskKind } = await load("../apps/desktop/renderer/agent-task-state.ts");
+test("reading scope exclusions reach report and developer instructions without excluding the real title", () => {
+  const discussion = buildReadingDiscussionPrompt("核对题名", { id: "overview", title: "赛题概览" });
+  for (const instructions of [readingReportStructure, readingWorkflowInstructions,
+    readingDeveloperInstructions("正式研读", true), readingDeveloperInstructions("正式研读", false), readingDeveloperInstructions(discussion, false)]) {
+    assert.ok(instructions.includes('2026年高教社杯全国大学生数学建模竞赛题目（请先阅读"全国大学生数学建模竞赛论文格式规范"）'));
+    assert.match(instructions, /不摘录、不放入原句引用块、不逐字句解读、不生成批注/);
+    assert.match(instructions, /必须保留紧随其后的题号、题名及实质正文/);
+    assert.match(instructions, /换行、空格、全角\/半角括号、中文\/英文引号差异或年份变化/);
+  }
+});
 const input = { stageId: "reading", signal: new AbortController().signal, settings: { network: true } };
 const run = { id: "r1", status: "running" };
 const progress = (sequence, phase, status, stepId = phase) => ({
