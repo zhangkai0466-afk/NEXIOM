@@ -24,6 +24,7 @@ import {
 import { commandSchema, type CoreResponse } from "../../packages/contracts";
 import { cleanStorage } from "../../packages/core/storage-cleanup";
 import { assertNotSystemDrive } from "../../packages/core/workspace-location";
+import { checkedFile } from "../../packages/filesystem/safe-files";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -620,6 +621,19 @@ else {
       assertSender(event);
       await restoreSecrets;
       const command = commandSchema.parse(input);
+      if (command.type === "workflow.export") {
+        const result = await request({ command }) as CoreResponse;
+        if (!result.exported || !result.project) throw new Error("文档导出失败。");
+        const printer = new BrowserWindow({ show: false, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false, javascript: false } });
+        try {
+          printer.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+          await printer.loadFile(checkedFile(result.project.root, result.exported.html));
+          const bytes = await printer.webContents.printToPDF({ printBackground: true, preferCSSPageSize: true });
+          await writeFile(checkedFile(result.project.root, result.exported.pdf), bytes);
+          result.exported.pdfReady = true;
+        } finally { printer.destroy(); }
+        return result;
+      }
       if (command.type === "storage.inspect" || command.type === "storage.clear") {
         const clear = command.type === "storage.clear";
         const result = await request({ command }) as CoreResponse;

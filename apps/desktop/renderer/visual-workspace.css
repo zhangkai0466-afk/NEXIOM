@@ -96,6 +96,7 @@
 .vws-dialog p { font-size: .9375rem; color: var(--muted); line-height: 1.7; overflow-wrap: anywhere; }
 .vws-dialog footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 12px; margin-top: 20px; }
 @container (max-width: 850px) {
+  .vws-heading strong { font-size:14px; gap:5px; white-space:nowrap; }
   .vws-body { grid-template-columns: 190px minmax(180px, 1fr) 220px; }
   .vws-header { gap: 8px; padding-inline: 10px; }
   .vws-title > span { max-width: 150px; }
@@ -105,10 +106,11 @@
 }
 @container (max-width: 630px) {
   .vws-header { flex-wrap: wrap; }
-  .vws-title { flex-basis: calc(100% - 160px); }
+  .vws-header > .workspace-heading { flex-basis: calc(100% - 160px); }
   .vws-actions { width: 100%; justify-content: flex-end; }
   .vws-body { grid-template-columns: 160px minmax(180px, 1fr) 190px; }
   .vws-create { padding-inline: 4px; }
   .vws-position { grid-template-columns: minmax(0, 1fr); }
   .vws-swatches { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
+.vws-design-start {display:grid;gap:10px;padding:14px 0;border-bottom:1px solid var(--border);font-size:12px}.vws-design-start select{width:100%;margin-top:8px}.vws-design-start button{white-space:normal}.modeling-thread.modeling-route{padding-left:28px;font-size:12px}

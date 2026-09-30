@@ -227,13 +227,13 @@ export function SettingsPage({
             </div>
             <label className="settings-row">
               <span className="settings-row-copy">
-                <strong>允许程序联网</strong>
+                <strong>允许文献联网检索</strong>
                 <span>
-                  允许研读时检索文献，以及执行任务中的程序访问网络。模型连接不受此设置影响。
+                  控制研读时的网页检索。Agent 默认拥有完全访问权限；终端与执行程序的联网不由此开关限制。
                 </span>
               </span>
               <input
-                aria-label="允许程序联网"
+                aria-label="允许文献联网检索"
                 className="switch"
                 type="checkbox"
                 checked={settings.network}
@@ -245,7 +245,7 @@ export function SettingsPage({
           </div>
         </section>
         <section className="settings-section">
-          <h2>项目工作区</h2>
+          <h2>项目工作区 · 完全访问</h2>
           <div className="settings-card">
             <div className="settings-row">
               <div className="settings-row-copy">

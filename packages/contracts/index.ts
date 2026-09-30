@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { workflowActionSchema, type WorkflowState } from "./workflow";
+import type { LocalPlugin, TerminalView } from "../core/project-tools";
 import { visualFigureSchema, visualLibrarySchema, type VisualAsset, type VisualWorkspaceState, type VisualElement } from "../visualization/document";
 import type { ThreadItem } from "../runtime";
 
@@ -21,6 +23,7 @@ export const threadStageSchema = z.enum([
 ]);
 export type ThreadStage = z.infer<typeof threadStageSchema>;
 export const accountProfileSchema = z.object({
+  avatarOriginal: z.string().max(12000000).regex(/^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/).nullable().optional(),
   nickname: z.string().trim().min(1).max(40).default("NEXIOM 用户"),
   avatar: z
     .string()
@@ -103,6 +106,21 @@ export interface ThreadContext {
 }
 
 export const commandSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("visual.design.start"), projectId: z.string().uuid(), library: visualLibrarySchema, argumentPath: z.string().max(1000).optional() }),
+  z.object({ type: z.literal("workflow.export"), projectId: z.string().uuid(), path: z.string().min(1).max(1000) }),
+  z.object({ type: z.literal("plugins.list"), projectId: z.string().uuid() }),
+  z.object({ type: z.literal("plugins.install"), projectId: z.string().uuid(), manifest: z.string().max(2000000) }),
+  z.object({ type: z.literal("plugins.toggle"), projectId: z.string().uuid(), id: z.string().min(1).max(64), enabled: z.boolean() }),
+  z.object({ type: z.literal("git.inspect"), projectId: z.string().uuid() }),
+  z.object({ type: z.literal("git.worktree"), projectId: z.string().uuid(), name: z.string().regex(/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,49}$/) }),
+  z.object({ type: z.literal("terminal.open"), projectId: z.string().uuid() }),
+  z.object({ type: z.literal("terminal.read"), projectId: z.string().uuid(), id: z.string().uuid() }),
+  z.object({ type: z.literal("terminal.write"), projectId: z.string().uuid(), id: z.string().uuid(), text: z.string().min(1).max(10000) }),
+  z.object({ type: z.literal("terminal.close"), projectId: z.string().uuid(), id: z.string().uuid() }),
+  z.object({ type: z.literal("workflow.read"), projectId: z.string().uuid() }),
+  z.object({ type: z.literal("workflow.update"), projectId: z.string().uuid(), change: workflowActionSchema }),
+  z.object({ type: z.literal("project.archive"), projectId: z.string().uuid(), archived: z.boolean() }),
+  z.object({ type: z.literal("pdf.save"), projectId: z.string().uuid(), name: z.string().min(1).max(200), base64: z.string().min(1).max(40000000) }),
   z.object({ type: z.literal("snapshot") }),
   z.object({ type: z.literal("usage.export") }),
   z.object({ type: z.literal("usage.import"), data: z.string().max(16 * 1024 * 1024) }),
@@ -255,6 +273,7 @@ export interface ProjectResetPreview {
   warnings: string[];
 }
 export interface Project {
+  archived?: boolean;
   id: string;
   name: string;
   root: string;
@@ -350,6 +369,11 @@ export interface FileContent {
   size: number;
 }
 export interface CoreResponse {
+  exported?: { source: string; docx: string; html: string; pdf: string; digest: string; pdfReady?: boolean };
+  plugins?: LocalPlugin[];
+  terminal?: TerminalView;
+  git?: { available: boolean; status: string; worktrees: string; log: string };
+  workflow?: WorkflowState;
   usageBackup?: string;
   recoveredActivities?: number;
   storage?: StorageSummary;

@@ -21,6 +21,7 @@ import { VISUAL_DESIGN_CAPABILITY_VERSION } from "../runtime/visual-design";
 import { READING_WORKFLOW_VERSION, isReadingDiscussionPrompt } from "../contracts/reading-workflow";
 import { ATTACHMENT_ANALYSIS_LIMIT, ATTACHMENT_WORKFLOW_VERSION, ATTACHMENT_TASK_MARKER, ATTACHMENT_CORRECTION_MARKER, attachmentTargets, attachmentTargetPrompt, parseAttachmentStage, parseAttachmentReports, type AttachmentTarget } from "../contracts/attachment-workflow";
 import { readProjectMemory } from "./memory";
+import { pluginInstructions } from "./project-tools";
 import { StreamCheckpoint } from "./stream-checkpoint";
 import { registerGeneratedFiles } from "../filesystem/generated-files";
 import type { TokenActivityLedger } from "./token-activity";
@@ -490,6 +491,8 @@ export class AgentCoordinator {
       .update(
         JSON.stringify([
           "nexiom-private-v1",
+          "development-guide-v1",
+          ...(stageId !== "validation" ? [pluginInstructions(projectRoot)] : []),
           provider.id,
           provider.revision,
           provider.kind,
@@ -581,7 +584,7 @@ export class AgentCoordinator {
       resolvedModelProvider,
       apiKey: this.secrets.get(provider.id),
       abort,
-      projectMemory: memory.text,
+      projectMemory: stageId === "validation" ? "" : memory.text + pluginInstructions(projectRoot),
       modelingContext,
     });
     this.active.set(runId, { abort, promise });

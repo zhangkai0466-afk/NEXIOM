@@ -1,5 +1,7 @@
 # Third-party notices
 
+Version 0.7.0 uses docx (MIT) for Word export, @xmldom/xmldom (MIT) for MathML parsing, image-size (MIT) for image dimensions, and unified / remark-parse (MIT) for Markdown document structure. KaTeX assets are included for offline PDF formulas. Installed production dependency notices and licenses are included in the portable release under licenses/npm/.
+
 The native visualization module imports the owner's local AI 可视化设计 MCP 1.7.1 and the required Scientific Palette Studio rendering code, palettes and gallery into `packages/visualization-engine/`. Source attribution and file hashes are retained in that directory's manifest. NEXIOM removes the MCP protocol layer and replaces the old model-configuration and PaperSpec transport dependency with its own native computation interface and Responses adapter. The original local projects did not contain a LICENSE file; this local import does not assert an open-source license for them or ownership of reference images. Existing reference-source metadata is retained. Python plotting libraries are independently installed and are not copied from a personal Codex runtime.
 
 NEXIOM includes OpenAI Codex open-source components from https://github.com/openai/codex under the Apache License 2.0.

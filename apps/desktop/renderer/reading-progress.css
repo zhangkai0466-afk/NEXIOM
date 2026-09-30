@@ -67,7 +67,7 @@
   animation: reading-link-enter 300ms ease var(--reading-arrival-delay, 0ms) both;
 }
 .reading-progress-step:first-child .reading-progress-link { display: none; }
-.reading-progress-back { position: absolute; top: 20px; left: 24px; }
+.reading-progress-back { position: absolute; top: 100px; left: 24px; }
 .reading-progress-controls {
   position: relative;
   flex: 0 0 76px;

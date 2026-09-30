@@ -4,10 +4,10 @@ import type { VisualPalette } from "../../../packages/contracts";
 import type { VisualAsset, VisualAssetSummary, VisualElement, VisualFigure, VisualWorkspaceState } from "../../../packages/visualization/document";
 import { renderVisualFigure } from "../../../packages/visualization/render";
 import { request, subscribe } from "./bridge";
-import { WorkspaceLogo } from "./WorkspaceLogo";
+import { WorkspaceHeading } from "./WorkspaceHeading";
 import "./visual-workspace.css";
 
-type Props = { projectId: string; onFilesChanged: () => void };
+type Props = { projectId: string; projectName: string; onFilesChanged: () => void };
 type History = { past: VisualFigure[]; present: VisualFigure; future: VisualFigure[] };
 const libraryNames = { modeling: "建模过程", paper: "论文论述" };
 const kindNames = { "grouped-bar": "分组条形图", line: "折线图", scatter: "散点图", diagram: "结构图" };
@@ -41,7 +41,7 @@ function AssetItem({ item, selected, onSelect }: { item: VisualAssetSummary; sel
   </button>;
 }
 
-export function VisualDesignWorkspace({ projectId, onFilesChanged }: Props) {
+export function VisualDesignWorkspace({ projectId, projectName, onFilesChanged }: Props) {
   const [workspace, setWorkspace] = useState<VisualWorkspaceState | null>(null);
   const [palettes, setPalettes] = useState<VisualPalette[]>([]);
   const [paletteId, setPaletteId] = useState("");
@@ -56,6 +56,19 @@ export function VisualDesignWorkspace({ projectId, onFilesChanged }: Props) {
   const [comparing, setComparing] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [designing, setDesigning] = useState(false);
+  const [argumentPaths, setArgumentPaths] = useState<string[]>([]);
+  const [argumentPath, setArgumentPath] = useState("");
+  useEffect(() => {
+    let active = true;
+    void request({ type: "project.files", projectId }).then(result => { if (active) setArgumentPaths((result.files ?? []).filter(file => /\.md$/i.test(file.path) && /paper|论文|论述/.test(file.path)).map(file => file.path)); }).catch(() => {});
+    return () => { active = false; };
+  }, [projectId, workspace]);
+  async function startDesign(library: "modeling" | "paper") {
+    setDesigning(true); setError("");
+    try { await request({ type: "visual.design.start", projectId, library, ...(library === "paper" ? { argumentPath } : {}) }); setNotice("图表设计任务已开始，生成的可编辑素材会自动出现在对应素材库。"); }
+    catch (error) { setError(errorMessage(error)); } finally { setDesigning(false); }
+  }
   const [intent, setIntent] = useState<VisualAssetSummary | null>(null);
   const [zoom, setZoom] = useState(1);
   const [available, setAvailable] = useState({ width: 500, height: 500 });
@@ -226,8 +239,7 @@ export function VisualDesignWorkspace({ projectId, onFilesChanged }: Props) {
 
   return <div className="vws">
     <header className="vws-header">
-      <WorkspaceLogo dimension="chart" />
-      <div className="vws-title"><strong>可视化工作台</strong><span>{asset?.title ?? "项目可视化素材"}{dirty && <i title="尚未保存" />}</span></div>
+      <WorkspaceHeading dimension="chart" projectName={projectName} title="可视化工作台" detail={asset ? `${asset.title}${dirty ? " · 尚未保存" : ""}` : undefined}/>
       <div className="vws-modes" role="tablist" aria-label="可视化编辑工具">
         <button role="tab" aria-selected={tool === "color"} className={tool === "color" ? "active" : ""} onClick={() => changeTool("color")}><Palette size={15} />调色</button>
         <button role="tab" aria-selected={tool === "layout"} className={tool === "layout" ? "active" : ""} onClick={() => changeTool("layout")}><Move size={15} />调整</button>
@@ -243,6 +255,7 @@ export function VisualDesignWorkspace({ projectId, onFilesChanged }: Props) {
       <aside className="vws-library" aria-label="Agent 可视化素材库">
         <div className="vws-heading"><strong><Folder size={16} />全部可视化素材</strong><button className="vws-icon" title="刷新素材库" aria-label="刷新素材库" disabled={loading} onClick={() => void refresh().catch(cause => setError(errorMessage(cause)))}><RefreshCw size={14} /></button></div>
         <label className="vws-search"><Search size={14} /><input aria-label="搜索项目素材" placeholder="搜索素材" value={query} onChange={event => setQuery(event.target.value)} /></label>
+        <div className="vws-design-start"><button className="vws-save" disabled={designing} onClick={() => void startDesign("modeling")}>根据最终模型设计图表</button><label>已确认的论文论述初稿<select aria-label="论文论述初稿" disabled={designing || !argumentPaths.length} value={argumentPath} onChange={event => setArgumentPath(event.target.value)}><option value="">{argumentPaths.length ? "选择项目中的初稿" : "暂无论文初稿"}</option>{argumentPaths.map(path => <option value={path} key={path}>{path.split(/[\\/]/).at(-1)}</option>)}</select></label><button className="vws-create" disabled={designing || !argumentPath} onClick={() => void startDesign("paper")}>确认初稿并设计论述图表</button></div>
         <div className="vws-asset-list">{loading ? <div className="vws-small-empty"><LoaderCircle className="spin" size={19} />正在读取素材库</div> : filtered.length ? filtered.map(item => <AssetItem key={item.id} item={item} selected={asset?.id === item.id} onSelect={() => navigate(item)} />) : <div className="vws-small-empty"><FolderOpen size={24} /><span>{query ? "没有匹配的素材" : "暂无 Agent 生成的素材"}</span></div>}</div>
         <div className="vws-library-path"><span>全部素材</span><span>{workspace?.assets.length ?? 0} 张</span></div>
       </aside>

@@ -27,6 +27,9 @@ export function previewProjectReset(db: DatabaseSync, project: Project, expected
   const root = checkedRoot(project.root);
   const memory = readProjectMemory(project);
   expectedHashes?.set(".nexiom/MEMORY.md", memory.revision);
+  const workflowPath = checkedFile(root, ".nexiom/workflow.json");
+  const workflowHash = existsSync(workflowPath) ? fileHash(workflowPath) : "";
+  if (workflowHash) expectedHashes?.set(".nexiom/workflow.json", workflowHash);
   const record = projectRecordFromDatabase(db, project.id, "");
   if (!record) throw new Error("项目不存在。");
   const preview: ProjectResetPreview = {
@@ -49,7 +52,7 @@ export function previewProjectReset(db: DatabaseSync, project: Project, expected
   } catch { preview.warnings.push("成果来源清单无法读取，本次仅重置项目记录，磁盘成果全部保留。"); }
   preview.generatedFiles.sort((a, b) => a.path.localeCompare(b.path));
   if (preview.preservedFiles) preview.warnings.push(`${preview.preservedFiles} 个已修改或无法核实的成果文件将保留。`);
-  preview.revision = createHash("sha256").update(JSON.stringify([record, memory.revision, hashes.sort(), preview.preservedFiles])).digest("hex");
+  preview.revision = createHash("sha256").update(JSON.stringify([record, memory.revision, workflowHash, hashes.sort(), preview.preservedFiles])).digest("hex");
   return preview;
 }
 
@@ -66,7 +69,7 @@ function finishJournal(dataDir: string, db: DatabaseSync, journal: Journal, comm
   const root = checkedRoot(journal.root);
   const stage = checkedFile(root, stageName(journal.id));
   for (const [index, relative] of journal.files.entries()) {
-    if (![".nexiom/project.json", ".nexiom/MEMORY.md"].includes(relative)) outputPath(root, relative);
+    if (![".nexiom/project.json", ".nexiom/MEMORY.md", ".nexiom/workflow.json"].includes(relative)) outputPath(root, relative);
     const target = checkedFile(root, relative);
     const backup = checkedFile(root, `${stageName(journal.id)}/${index}`);
     if (!existsSync(backup)) continue; // A crash may precede this particular rename.
@@ -120,7 +123,7 @@ export function resetProject(dataDir: string, db: DatabaseSync, project: Project
   if (!writeProjectRecord(db, project.id)) throw new Error("项目不存在。");
   const root = checkedRoot(project.root);
   expectedHashes.set(".nexiom/project.json", fileHash(checkedFile(root, ".nexiom/project.json"), 128 * 1024 * 1024));
-  const files = [".nexiom/project.json", ".nexiom/MEMORY.md"]
+  const files = [".nexiom/project.json", ".nexiom/MEMORY.md", ".nexiom/workflow.json"]
     .filter(relative => existsSync(checkedFile(root, relative)));
   if (options.deleteGenerated) files.push(...preview.generatedFiles.map(file => file.path));
   for (const relative of files) {

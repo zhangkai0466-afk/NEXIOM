@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, rm } from "node:fs/promises";
+import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
@@ -46,7 +47,9 @@ test("continuous output checkpoints its portable record without rewriting it on 
   const { runId } = await core.request({ type: "agent.submit", threadId: thread.id,
     text: "Local fixture", clientRequestId: randomUUID() });
   const recordPath = path.join(project.root, ".nexiom", "project.json");
-  const readRecord = async () => JSON.parse(await readFile(recordPath, "utf8"));
+  // Close the test reader before yielding to the checkpoint timer. An async
+  // read can hold the Windows file handle across the core's atomic rename.
+  const readRecord = () => JSON.parse(readFileSync(recordPath, "utf8"));
   const textInRecord = record => {
     const item = record.records.agentItems.find(item => item.id === `${runId}:answer`);
     return item ? JSON.parse(item.payload).text : "";

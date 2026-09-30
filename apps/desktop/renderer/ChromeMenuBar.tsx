@@ -1,13 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from "react";
 
+type MenuItem = { label: string; onSelect?: () => void; children?: MenuItem[] };
 type Menu = {
   label: string;
-  items: { label: string; onSelect: () => void }[];
+  items: MenuItem[];
 };
 
 export function ChromeMenuBar({ menus, hidden = false }: { menus: Menu[]; hidden?: boolean }) {
   const [open, setOpen] = useState<number | null>(null);
   const [tabStop, setTabStop] = useState(0);
+  const [submenu, setSubmenu] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const triggers = useRef<(HTMLButtonElement | null)[]>([]);
   const panel = useRef<HTMLDivElement>(null);
@@ -19,6 +21,7 @@ export function ChromeMenuBar({ menus, hidden = false }: { menus: Menu[]; hidden
     hoverOpened.current = null;
     pendingFocus.current = null;
     setOpen(null);
+    setSubmenu(null);
   }
 
   function show(index: number, focus: "first" | "last" | null = null) {
@@ -145,17 +148,21 @@ export function ChromeMenuBar({ menus, hidden = false }: { menus: Menu[]; hidden
               }}
             >
               {menu.items.map((item) => (
+                <div className="chrome-submenu-root" key={item.label}>
                 <button
-                  key={item.label}
                   role="menuitem"
                   tabIndex={-1}
                   onPointerEnter={(event) => {
-                    if (event.pointerType === "mouse") event.currentTarget.focus();
+                    if (event.pointerType === "mouse") { event.currentTarget.focus(); setSubmenu(item.children ? item.label : null); }
                   }}
-                  onClick={() => { close(true); item.onSelect(); }}
+                  aria-haspopup={item.children ? "menu" : undefined}
+                  aria-expanded={item.children ? submenu === item.label : undefined}
+                  onClick={() => { if (item.children) setSubmenu(item.label); else { close(true); item.onSelect?.(); } }}
                 >
                   {item.label}
                 </button>
+                {item.children && submenu === item.label && <div className="chrome-popover chrome-submenu" role="menu" aria-label={item.label}>{item.children.map(child => <button key={child.label} role="menuitem" onClick={() => { child.onSelect?.(); close(true); }}>{child.label}</button>)}</div>}
+                </div>
               ))}
             </div>
           )}

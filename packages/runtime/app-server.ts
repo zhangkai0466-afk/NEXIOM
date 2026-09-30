@@ -541,7 +541,7 @@ export async function* runAppServer(options: {
   input.signal.addEventListener("abort", abort, { once: true });
   try {
     await connection.request("initialize", {
-      clientInfo: { name: "nexiom", title: "NEXIOM", version: "0.6.25" },
+      clientInfo: { name: "nexiom", title: "NEXIOM", version: "0.7.7" },
       capabilities: { experimentalApi: true },
     });
     connection.notify("initialized");
@@ -551,7 +551,7 @@ export async function* runAppServer(options: {
       // project/ancestor .codex configuration, instructions, hooks or MCPs.
       cwd: options.runtimeHome,
       approvalPolicy: "never",
-      sandbox: "workspace-write",
+      sandbox: "danger-full-access",
       config: options.config,
       baseInstructions: options.baseInstructions,
       ...(options.developerInstructions
@@ -583,13 +583,7 @@ export async function* runAppServer(options: {
       threadId,
       cwd: input.cwd,
       approvalPolicy: "never",
-      sandboxPolicy: {
-        type: "workspaceWrite",
-        writableRoots: [input.cwd],
-        networkAccess: input.settings.network,
-        excludeTmpdirEnvVar: true,
-        excludeSlashTmp: true,
-      },
+      sandboxPolicy: { type: "dangerFullAccess" },
       input: [{ type: "text", text: input.prompt, text_elements: [] }],
       summary: "none",
       ...(input.settings.effort !== "default"

@@ -1,5 +1,8 @@
 import type { AgentInput } from "./index";
 import type { NativeToolRegistry } from "./visual-design";
+import { workflowActionSchema } from "../contracts/workflow";
+import { readWorkflow, saveWorkflow, writeWorkflowFile } from "../core/workflow";
+import { randomUUID } from "node:crypto";
 import { isReadingDiscussionPrompt, nextReadingPhases, parseReadingProgress, type ReadingProgress } from "../contracts/reading-workflow";
 
 export function readingWebSearchMode(input: Pick<AgentInput, "stageId" | "settings">): "live" | "disabled" {
@@ -11,7 +14,10 @@ export function createReadingTools(input: AgentInput): NativeToolRegistry | unde
   const steps = new Map<string, ReadingProgress>();
   let closed = false;
   return {
-    specs: [{ type: "namespace", name: "nexiom_reading", description: "赛题研读实际工作阶段。只记录状态，不接收内部推理。", tools: [{
+    specs: [{ type: "namespace", name: "nexiom_reading", description: "赛题研读阶段与文献调研。", tools: [{
+      type: "function", name: "save_research", description: "把已查证的文献调研保存到项目统一文献区。正文必须注明来源和证据限制，不把未取得的资料说成已读。",
+      inputSchema: { type: "object", properties: { category: { type: "string", enum: ["术语口径", "题目背景", "方法与概念", "背景插图"] }, title: { type: "string", maxLength: 200 }, body: { type: "string", maxLength: 24000 }, source: { type: "string", maxLength: 500 } }, required: ["category", "title", "body", "source"], additionalProperties: false }, deferLoading: false,
+    }, {
       type: "function", name: "set_reading_stage", description: "开始、完成或失败一段有明确目标的研读工作。顺序为思考（可选，仅理解任务与选择读取方式）→阅读原题→分析→思考复核→检索（按需）→思考核验→编写；首个实质工作是完整阅读，无需检索可从复核进入编写。分批读文件、逐问分析、内部思考、多次搜索、多来源阅读和局部回看都在所属阶段内完成，不按工具次数拆分。达到工作完成条件才结束，工具返回不代表阶段完成；未发生阶段不补。实际目标切换才报新阶段，真实回访、失败重试使用新 stepId；真实重读仍经阅读→分析→思考，检索后仍须思考核验。界面汇总为最多 7 个节点，不限制实际工作次数。完成前必须先开始，同一时刻只记录一个主阶段。",
       inputSchema: { type: "object", properties: {
         stepId: { type: "string", pattern: "^[a-zA-Z0-9_-]{1,64}$" },
@@ -21,6 +27,18 @@ export function createReadingTools(input: AgentInput): NativeToolRegistry | unde
     }] }],
     close() { closed = true; },
     async call(namespace, tool, args) {
+      if (namespace === "nexiom_reading" && tool === "save_research" && !closed && !input.signal.aborted) {
+        try {
+          const value = workflowActionSchema.parse({ ...(args as object), action: "research" });
+          if (value.action !== "research") throw new Error("无效调研内容");
+          const state = readWorkflow(input.cwd);
+          const record = { ...value, id: randomUUID(), createdAt: new Date().toISOString() };
+          state.research.push(record);
+          writeWorkflowFile(input.cwd, `reading/research/${record.id}.md`, `# ${record.title}\n\n分类：${record.category}\n来源板块：${record.source}\n\n${record.body}`);
+          saveWorkflow(input.cwd, state);
+          return { success: true, contentItems: [{ type: "inputText", text: JSON.stringify({ accepted: true, id: record.id }) }] };
+        } catch (error) { return { success: false, contentItems: [{ type: "inputText", text: (error as Error).message }] }; }
+      }
       const progress = parseReadingProgress(args);
       let error = "";
       if (isReadingDiscussionPrompt(input.prompt)) error = "当前是研读完成后的讨论，不能上报或重开研读阶段。不要再次调用本工具，请直接用文字回应。";

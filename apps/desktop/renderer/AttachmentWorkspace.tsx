@@ -7,9 +7,10 @@ import { AgentTaskIcon, AgentTaskStatus } from "./AgentTaskStatus";
 import { attachmentAnalysis } from "./attachment-progress";
 import { getAgentItemOutcome } from "./agent-task-state";
 import { AttachmentPaneDivider } from "./AttachmentPaneDivider";
-import { WorkspaceLogo } from "./WorkspaceLogo";
 import { readPreference, writePreference } from "./preferences";
 import "./attachment-workspace.css";
+import { AutoTextarea } from "./AutoTextarea";
+import { WorkspaceHeading } from "./WorkspaceHeading";
 
 export { ATTACHMENT_TASK_MARKER, ATTACHMENT_CORRECTION_MARKER, ATTACHMENT_ANALYSIS_LIMIT } from "../../../packages/contracts/attachment-workflow";
 export { parseAttachmentReports } from "./attachment-progress";
@@ -115,10 +116,11 @@ export function AttachmentWorkspace({
   };
 
   if ((!start && !activeRun) || restarting) return (
-    <section className="reading-intake" aria-labelledby="attachment-intake-title">
+    <section className="reading-intake workspace-intake" aria-labelledby="attachment-intake-title">
+      <header className="workspace-state-header"><WorkspaceHeading dimension="attachments" projectName={projectName} title="附件分析"/></header>
       {start && <button type="button" className="reading-back-button" onClick={() => setRestarting(false)}><ArrowLeft size={16} />返回附件工作台</button>}
       <div className="reading-intake-content">
-        <div className="reading-intake-heading"><WorkspaceLogo dimension="attachments" className="reading-intake-logo" /><h1 id="attachment-intake-title">导入附件</h1></div>
+        <div className="reading-intake-heading"><h2 id="attachment-intake-title">导入附件</h2></div>
         <div className="reading-intake-layout">
           <div className="reading-file-intake"><button type="button" className="reading-file-picker" onClick={modelReady ? onImport : onConfigureModel} disabled={busy}>
             <FileUp size={19} />{busy ? "正在导入" : modelReady ? "导入附件" : "先配置模型"}
@@ -132,11 +134,7 @@ export function AttachmentWorkspace({
     <section className={"reading-workspace attachment-workspace " + (correctionOpen ? "" : "correction-closed")}
       style={{ "--attachment-outline-width": Math.min(outlineWidth, outlineMax) + "px", "--reading-correction-width": Math.min(correctionWidth, correctionMax) + "px" } as CSSProperties}>
       <header className="reading-report-header">
-        <div className="reading-report-title"><WorkspaceLogo dimension="attachments" /><div>
-          <span className="reading-eyebrow"><Paperclip size={14} />{projectName}</span>
-          <h1>附件分析</h1>
-          <p>{current ? "正在分析：" + current.target.name + " · " : ""}已完成 {finished} / {states.length} 个附件</p>
-        </div></div>
+        <WorkspaceHeading dimension="attachments" projectName={projectName} title="附件分析" detail={`${current ? "正在分析：" + current.target.name + " · " : ""}已完成 ${finished} / ${states.length} 个附件`}/>
         <div className="reading-report-actions">
           {activeRun && kind && <AgentTaskStatus kind={kind} compact label={phaseNames[kind] + "中"} />}
           {activeRun ? <button type="button" className="secondary-button" onClick={onCancel}><Square size={14} />停止分析</button>
@@ -210,8 +208,8 @@ export function AttachmentWorkspace({
                 {!targetCorrections.length && <div className="reading-correction-empty"><MessageSquareText size={23} /><p>当前附件还没有纠偏记录</p><span>这里的修改只更新这个附件的报告。</span></div>}
                 {targetCorrections.map((correction, index) => <div className="reading-correction-item" key={correction.id}><span>纠偏 {index + 1}</span><p>{correction.text}</p><small>{new Date(correction.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</small></div>)}
               </div>
-              <form className="reading-correction-form" onSubmit={correct}>
-                <textarea aria-label={"纠偏" + (selected?.target.name ?? "当前附件")} placeholder="说明这个附件哪里识别错了、遗漏了什么，或应采用什么口径……"
+                <form className="reading-correction-form compact-correction-form" onSubmit={correct}>
+                  <AutoTextarea aria-label={"纠偏" + (selected?.target.name ?? "当前附件")} placeholder="讨论当前附件…"
                   value={draft} maxLength={4000} disabled={busy || !!activeRun || !selected}
                   onChange={event => { if (selected) setDrafts(current => ({ ...current, [selected.target.path]: event.target.value })); }}
                   onKeyDown={event => { if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); correct(event); } }} />

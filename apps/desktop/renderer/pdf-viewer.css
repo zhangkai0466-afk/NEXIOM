@@ -3,7 +3,7 @@
   background: var(--panel); color: var(--text); overflow: hidden; container-type: inline-size;
 }
 .nexiom-pdf:fullscreen { width: 100vw; height: 100vh; background: var(--panel); }
-.nexiom-pdf button:not(.nexiom-pdf-thumbnail):not(.nexiom-pdf-sidebar button):not(.pdfViewer button) {
+.nexiom-pdf-toolbar button, .nexiom-pdf-find button {
   flex: 0 0 30px; width: 30px; height: 30px; padding: 0; border-radius: 4px; color: var(--text); background: transparent;
 }
 .nexiom-pdf button:hover:not(:disabled) { background: var(--hover); }
@@ -26,6 +26,7 @@
 .nexiom-pdf-find > span { min-width: 40px; text-align: center; font-size: 12px; color: var(--muted); }
 .nexiom-pdf-find label { display: flex; align-items: center; gap: 4px; font-size: 12px; white-space: nowrap; }
 .nexiom-pdf-notice { font-size: 12px; padding: 6px 12px; color: var(--danger); }
+.nexiom-pdf-notice[data-success="true"] { color: var(--text); }
 .nexiom-pdf-body { min-width: 0; min-height: 0; display: flex; flex: 1; }
 .nexiom-pdf-stage { position: relative; min-width: 0; min-height: 0; flex: 1; }
 .nexiom-pdf-scroll { position: absolute; inset: 0; overflow: auto; background: #e6e6e6; overscroll-behavior: contain; }

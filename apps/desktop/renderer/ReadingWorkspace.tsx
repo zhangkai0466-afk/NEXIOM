@@ -30,6 +30,9 @@ import {
 import type { AgentItem, FileContent, Message, ProjectFile, Run } from "../../../packages/contracts";
 import { RichText } from "./AgentOutput";
 import { PdfViewer } from "./PdfViewer";
+import { ReadingSectionBody } from "./ReadingSections";
+import { request } from "./bridge";
+import type { WorkflowAction, WorkflowState } from "../../../packages/contracts/workflow";
 import { AgentActivity } from "./AgentActivity";
 import { AgentTaskStatus } from "./AgentTaskStatus";
 import { NexiomMark } from "./NexiomMark";
@@ -42,8 +45,9 @@ import {
   readingDiscussionBounds,
 } from "../../../packages/contracts/reading-workflow";
 import { ReadingProgress } from "./ReadingProgress";
+import { AutoTextarea } from "./AutoTextarea";
+import { WorkspaceHeading } from "./WorkspaceHeading";
 import { latestFormalReadingRun, readingCanViewReport, readingSteps } from "./reading-progress";
-import { WorkspaceLogo } from "./WorkspaceLogo";
 import { readPreference, writePreference } from "./preferences";
 
 export const READING_TASK_MARKER = "[NEXIOM赛题研读任务]";
@@ -58,6 +62,7 @@ type SectionKind =
   | "trap"
   | "pending"
   | "delivery"
+  | "research"
   | "other";
 
 interface ReadingSection {
@@ -74,6 +79,7 @@ export interface ReadingCorrectionTarget {
 }
 
 interface ReadingWorkspaceProps {
+  projectId: string;
   projectName: string;
   messages: Message[];
   agentItems: AgentItem[];
@@ -96,12 +102,13 @@ interface ReadingWorkspaceProps {
 
 function sectionKind(title: string): SectionKind {
   const normalized = title.replace(/[\s·：:、—_-]/g, "").toLowerCase();
+  if (/文献调研/.test(normalized)) return "research";
   if (/问题[一二三四五六七八九十\d]+/.test(normalized)) return "question";
   if (/逐字|逐句|原题|题干/.test(normalized)) return "source";
   if (/名词|术语|符号|变量|数据|口径|单位/.test(normalized)) return "terms";
   if (/依赖|关系图|承接/.test(normalized)) return "dependency";
   if (/陷阱|误区|风险/.test(normalized)) return "trap";
-  if (/待核|歧义|确认|不确定/.test(normalized)) return "pending";
+  if (/待.*核对|待核|歧义|确认|不确定/.test(normalized)) return "pending";
   if (/交付|提交|成果清单/.test(normalized)) return "delivery";
   if (/概览|总体|题意/.test(normalized)) return "overview";
   return "other";
@@ -275,6 +282,7 @@ function SectionIcon({ kind, size = 16 }: { kind: SectionKind; size?: number }) 
 
 
 export function ReadingWorkspace({
+  projectId,
   projectName,
   messages,
   agentItems,
@@ -294,6 +302,17 @@ export function ReadingWorkspace({
   onConfigureModel,
   onCancel,
 }: ReadingWorkspaceProps) {
+  const [workflow, setWorkflow] = useState<WorkflowState>();
+  const [workflowError, setWorkflowError] = useState("");
+  useEffect(() => {
+    let active = true;
+    void request({ type: "workflow.read", projectId }).then(result => { if (active) setWorkflow(result.workflow); }).catch(error => { if (active) setWorkflowError(error.message); });
+    return () => { active = false; };
+  }, [projectId, latestRun?.status, messages.length]);
+  async function updateWorkflow(change: WorkflowAction) {
+    try { setWorkflowError(""); const result = await request({ type: "workflow.update", projectId, change }); setWorkflow(result.workflow); }
+    catch (error) { setWorkflowError((error as Error).message); throw error; }
+  }
   const readingStartSequence = messages
     .filter((message) => message.role === "user" && message.text.startsWith(READING_TASK_MARKER))
     .reduce((latest, message) => Math.max(latest, message.sequence), -1);
@@ -311,7 +330,11 @@ export function ReadingWorkspace({
     [agentItems, activeRun],
   );
   const shownReport = viewingReport && activeRun && !discussing ? draftReport || report : report;
-  const sections = useMemo(() => parseReadingReport(shownReport), [shownReport]);
+  const sections = useMemo(() => {
+    const result = parseReadingReport(shownReport);
+    if (result.length && !result.some(section => section.kind === ("research" as SectionKind))) result.splice(Math.max(0, result.length - 1), 0, { id: "research", title: "文献调研", kind: "research" as SectionKind, body: "在任意板块提出文献调研请求，结果会分类积累到这里。未经核实的引用应标明证据限制。" });
+    return result;
+  }, [shownReport]);
   const turns = useMemo(
     () => discussionTurns(messages, agentItems, readingStartSequence),
     [messages, agentItems, readingStartSequence],
@@ -522,13 +545,14 @@ export function ReadingWorkspace({
   };
 
   if (progressHistory && formalRun && !activeRun) {
-    return <ReadingProgress key={`history:${formalRun.id}`} run={formalRun} items={agentItems} onCancel={onCancel} history
+    return <ReadingProgress projectName={projectName} key={`history:${formalRun.id}`} run={formalRun} items={agentItems} onCancel={onCancel} history
       onBack={() => setProgressHistory(false)} backLabel={report && !restarting ? "返回研读报告" : "返回输入"} />;
   }
 
   if ((!report && !activeRun) || (restarting && !activeRun)) {
     return (
-      <section className="reading-intake" aria-labelledby="reading-intake-title">
+      <section className="reading-intake workspace-intake" aria-labelledby="reading-intake-title">
+        <header className="workspace-state-header"><WorkspaceHeading dimension="reading" projectName={projectName} title="赛题研读"/></header>
         {report && restarting && (
           <button type="button" className="reading-back-button" onClick={() => setRestarting(false)}>
             <ArrowLeft size={16} />返回研读报告
@@ -536,8 +560,7 @@ export function ReadingWorkspace({
         )}
         <div className="reading-intake-content">
           <div className="reading-intake-heading">
-            <WorkspaceLogo dimension="reading" className="reading-intake-logo" />
-            <h1 id="reading-intake-title">输入赛题文件</h1>
+            <h2 id="reading-intake-title">输入赛题文件</h2>
           </div>
           <div className="reading-intake-layout">
             <form className="reading-file-intake" onSubmit={start}>
@@ -599,12 +622,13 @@ export function ReadingWorkspace({
   }
 
   const canViewReport = !!activeRun && readingCanViewReport(readingSteps(agentItems, activeRun), activeRun);
-  if (activeRun && !discussing && !viewingReport) return <ReadingProgress key={activeRun.id} run={activeRun} items={agentItems} onCancel={onCancel} onViewReport={canViewReport ? () => setViewingReport(true) : undefined} />;
+  if (activeRun && !discussing && !viewingReport) return <ReadingProgress projectName={projectName} key={activeRun.id} run={activeRun} items={agentItems} onCancel={onCancel} onViewReport={canViewReport ? () => setViewingReport(true) : undefined} />;
   if (!discussing && !viewingReport && latestRun?.id === animatedRunId && latestRun.status === "succeeded" && report) {
-    return <ReadingProgress key={latestRun.id} run={latestRun} items={agentItems} onCancel={onCancel} />;
+    return <ReadingProgress projectName={projectName} key={latestRun.id} run={latestRun} items={agentItems} onCancel={onCancel} />;
   }
   if (viewingReport && activeRun && !shownReport) {
     return <section className="reading-report-pending" aria-live="polite">
+      <WorkspaceHeading dimension="reading" projectName={projectName} title="赛题研读报告"/>
       <p>报告仍在写入。</p>
       <div>
         <button type="button" className="secondary-button" onClick={() => setViewingReport(false)}><ArrowLeft size={15} />返回进度</button>
@@ -619,18 +643,10 @@ export function ReadingWorkspace({
       style={{ "--reading-correction-width": `${displayedCorrectionWidth}px` } as CSSProperties}
     >
       <header className="reading-report-header">
-        <div className="reading-report-title">
-          <WorkspaceLogo dimension="reading" />
-          <div>
-            <span className="reading-eyebrow"><BookOpen size={14} />{projectName}</span>
-            <h1>赛题研读报告</h1>
-            <p>{discussing ? "正在讨论当前板块，已发布报告保持不变" : activeRun ? "正在根据新的信息更新报告" : `已整理 ${sections.length} 个研读板块`}</p>
-          </div>
-        </div>
+        <WorkspaceHeading dimension="reading" projectName={projectName} title="赛题研读报告" detail={discussing ? "正在讨论当前板块，已发布报告保持不变" : activeRun ? "正在根据新的信息更新报告" : `已整理 ${sections.length} 个研读板块`}/>
         <div className="reading-report-actions">
           {runOutcome && !discussionTurn && <AgentTaskStatus kind={currentTaskKind} status={runOutcome} compact final />}
           {activeRun && !discussing && <button type="button" className="secondary-button" onClick={() => setViewingReport(false)}><ArrowLeft size={15} />返回进度</button>}
-          {!activeRun && formalRun && <button type="button" className="secondary-button" onClick={() => setProgressHistory(true)}><History size={15} />研读过程</button>}
           <button
             type="button"
             className="secondary-button"
@@ -651,7 +667,7 @@ export function ReadingWorkspace({
             onClick={() => correctionOpen ? closeCorrection() : setCorrectionOpen(true)}
           >
             {correctionOpen ? <PanelRightClose size={15} /> : <PanelRightOpen size={15} />}
-            人工纠偏
+            {selectedSource ? "聊聊原题" : "人工纠偏"}
             {!!targetTurns.length && <span className="reading-correction-count">{targetTurns.length}</span>}
           </button>
         </div>
@@ -689,6 +705,7 @@ export function ReadingWorkspace({
           ))}
         </nav>
         <article className={`reading-report-body ${selectedSource ? "pdf-active" : ""}`} aria-live="polite">
+          {workflowError && <p role="alert" className="form-error">{workflowError}</p>}
           {selectedSource ? (
             <div className="reading-pdf-document">
               {sourceLoading === selectedSource.path ? (
@@ -700,6 +717,8 @@ export function ReadingWorkspace({
                   className="reading-pdf-viewer"
                   base64={pdfContents[selectedSource.path]}
                   title={selectedSource.name}
+                  onSave={async base64 => { await request({ type: "pdf.save", projectId, name: selectedSource.name, base64 }); }}
+                  onQuote={quote => { if (!correctionTarget) return; setCorrectionOpen(true); setCorrectionDrafts(current => ({ ...current, [correctionTarget.id]: (current[correctionTarget.id] ?? "") + quote })); requestAnimationFrame(() => correctionPanel.current?.querySelector("textarea")?.focus()); }}
                 />
               ) : null}
             </div>
@@ -709,7 +728,7 @@ export function ReadingWorkspace({
                 <span><SectionIcon kind={selected.kind} size={18} /></span>
                 <div><h2>{selected.title}</h2></div>
               </div>
-              <RichText text={selected.body || "本板块暂无内容。"} reading />
+              <ReadingSectionBody key={selected.id} kind={selected.kind} body={selected.body} state={workflow} onChange={updateWorkflow} />
             </>
           )}
         </article>
@@ -735,7 +754,7 @@ export function ReadingWorkspace({
             <div className="reading-correction-slot" inert={!correctionOpen} aria-hidden={!correctionOpen}>
             <aside id="reading-correction-panel" ref={correctionPanel} className="reading-correction-panel" aria-label={`${correctionTarget?.title ?? "当前板块"}的人工纠偏`}>
               <header>
-                <div><MessageSquareText size={18} /><strong>人工纠偏</strong></div>
+                <div><MessageSquareText size={18} /><strong>{selectedSource ? "聊聊原题" : "人工纠偏"}</strong></div>
                 <span className="reading-correction-target">{correctionTarget?.title}</span>
               </header>
               <div className="reading-correction-history" ref={correctionHistory} aria-label="当前板块讨论">
@@ -775,7 +794,7 @@ export function ReadingWorkspace({
                 ))}
               </div>
               <form className="composer reading-discussion-composer" onSubmit={correct}>
-                <textarea
+                <AutoTextarea
                   aria-label={`讨论${correctionTarget?.title ?? "当前板块"}`}
                   placeholder="向 NEXIOM 发送任务…"
                   value={correctionDraft}
@@ -783,9 +802,6 @@ export function ReadingWorkspace({
                   disabled={!correctionTarget}
                   onChange={(event) => {
                     if (!correctionTarget) return;
-                    const field = event.target;
-                    field.style.height = "auto";
-                    field.style.height = `${Math.min(220, field.scrollHeight)}px`;
                     setCorrectionDrafts((current) => ({ ...current, [correctionTarget.id]: event.target.value }));
                   }}
                   onKeyDown={(event) => {

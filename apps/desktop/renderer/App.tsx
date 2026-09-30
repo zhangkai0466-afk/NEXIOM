@@ -63,7 +63,10 @@ import { getAgentItemOutcome, outputBlockedByThinking } from "./agent-task-state
 import { PdfViewer } from "./PdfViewer";
 import { ChromeMenuBar } from "./ChromeMenuBar";
 import { VisualDesignWorkspace } from "./VisualDesignWorkspace";
+import { ProjectTools } from "./ProjectTools";
+import { ModelWorkflowWorkspace } from "./ModelWorkflowWorkspace";
 import { WorkspaceLogo } from "./WorkspaceLogo";
+import { WorkspaceHeading } from "./WorkspaceHeading";
 import { NexiomMark } from "./NexiomMark";
 import { VisualizationIcon } from "./VisualizationIcon";
 import {
@@ -172,7 +175,7 @@ function buildReadingTaskPrompt(files: ProjectFile[]) {
 
 你正在执行数学建模赛题的正式研读，不是普通聊天。请逐一打开并完整读取项目中的赛题文件。你的目标是帮助参赛者准确理解题目，而不是提前编造结论。凡是文件中无法可靠解析的公式、图片或表格，必须定位并标为待核对。
 
-研读过程中使用 nexiom_reading.set_reading_stage 如实报告阶段开始与完成。顺序为起始思考（仅在实际发生时）→阅读→分析→思考→按需检索→思考→编写，第一项实质工作必须是阅读赛题。不需检索可从思考进入编写。每个阶段代表一个完整工作目标，分批读取、逐问拆解、内部思考和多次查询都在所属阶段内完成，不为小动作反复上报阶段。重读和反复查证纳入当前复核工作；确需再次开启主阶段时仍如实报告，界面合并到原有环节，最多展示七个节点。只有达到工作目标或明确留下待核对项才报告完成。界面只显示阶段动画，不展示过程正文或隐藏思维链。完成术语、信息泄漏及跨问依赖核验后输出唯一一份完整报告。口径推荐限于题意理解，最终交由人工抉择；严禁输出可行路线或建模建议。
+研读过程中使用 nexiom_reading.set_reading_stage 如实报告阶段开始与完成。顺序为起始思考（仅在实际发生时）→阅读→分析→思考→按需检索→思考→编写，第一项实质工作必须是阅读赛题。不需检索可从思考进入编写。每个阶段代表一个完整工作目标，分批读取、逐问拆解、内部思考和多次查询都在所属阶段内完成，不为小动作反复上报阶段。重读和反复查证纳入当前复核工作；确需再次开启主阶段时仍如实报告，界面合并到原有环节，最多展示七个节点。只有达到工作目标或明确留下待核对项才报告完成。界面只显示阶段动画，不展示过程正文或隐藏思维链。完成术语、信息泄漏及跨问依赖核验后输出唯一一份完整报告。口径推荐限于题意理解，最终交由人工抉择；仅在每问指定小节给出2—3条基础建模意见，不开展正式求解。
 
 【项目材料】
 ${materials}
@@ -273,6 +276,8 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
   const requestedThreadId = useRef(new URLSearchParams(window.location.search).get("thread") ?? "");
   const detachedWindow = useRef(!!requestedThreadId.current).current;
   const appearance = useAppearance();
+  const [workflowQuestionId, setWorkflowQuestionId] = useState("");
+  const [projectTool, setProjectTool] = useState<"terminal" | "plugins" | "git" | null>(null);
   const [snapshot, setSnapshot] = useState<Snapshot>(emptySnapshot);
   const [projectId, setProjectId] = useState(
     () => readPreference("nexiom.project") ?? "",
@@ -379,7 +384,8 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
   const showConversation = !showProjectOverview && insideProject && !!thread && thread.stageId === dimension;
   const showReadingWorkspace = showConversation && !casualMode && dimension === "reading" && view === "conversation";
   const showAttachmentWorkspace = showConversation && !casualMode && dimension === "attachments" && view === "conversation";
-  const showStructuredWorkspace = showReadingWorkspace || showAttachmentWorkspace;
+  const showModelWorkflow = insideProject && !!project && !casualMode && ["model", "validation"].includes(dimension) && view !== "activity";
+  const showStructuredWorkspace = showReadingWorkspace || showAttachmentWorkspace || showModelWorkflow;
   const showVisualLibrary = insideProject && !!project && !casualMode && dimension === "chart" && !showConversation && view !== "activity";
   const currentQuestion = snapshot.questions.find((item) => item.id === thread?.questionId);
   const messages = snapshot.messages.filter(
@@ -1225,6 +1231,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
 
   return (
     <MotionConfig reducedMotion={appearance.reduceMotion ? "always" : "user"}>
+      {projectTool && project && <Modal wide title={projectTool === "terminal" ? "项目终端" : projectTool === "plugins" ? "项目插件" : "Git 与工作树"} onClose={() => setProjectTool(null)}><ProjectTools key={project.id + projectTool} project={project} kind={projectTool} /></Modal>}
       {settingsPage && (
         <SettingsPage
           initialCategory={settingsPage}
@@ -1251,16 +1258,19 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
             label={sidebar ? "收起侧栏" : "展开侧栏"}
             onClick={() => setSidebar((value) => !value)}
           >
-            <PanelLeftOpen size={15} />
+            <svg className={`sidebar-toggle-icon ${sidebar ? "expanded" : ""}`} width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"><rect x="3" y="4" width="18" height="16" rx="4" /><path d="M9 4v16" /></svg>
           </IconButton>
           <ChromeMenuBar hidden={!!settingsPage} menus={[
             { label: "文件", items: [
               { label: "添加", onSelect: addProject },
               { label: "设置", onSelect: () => openSettings() },
+              { label: "打开项目终端", onSelect: () => project ? setProjectTool("terminal") : setError("请先打开一个项目。") },
+              { label: "项目插件", onSelect: () => project ? setProjectTool("plugins") : setError("请先打开一个项目。") },
+              { label: "Git 与工作树", onSelect: () => project ? setProjectTool("git") : setError("请先打开一个项目。") },
             ] },
             { label: "视图", items: [
               { label: "切换侧栏", onSelect: () => setSidebar((value) => !value) },
-              { label: "外观", onSelect: () => openSettings("appearance") },
+              { label: "外观", children: [{ label: "浅色", onSelect: () => appearance.setTheme("light") }, { label: "深色", onSelect: () => appearance.setTheme("dark") }, { label: "跟随系统", onSelect: () => appearance.setTheme("system") }] },
             ] },
           ]} />
         </div>
@@ -1278,11 +1288,13 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
           agentItems={snapshot.items}
           inside={insideProject && !!project && !casualMode} casualSelected={casualMode} dimension={dimension} threadId={threadId} busy={busy}
           onAddProject={addProject} onEnterProject={enterProject}
+          onQuestion={(stage, id) => { selectWorkspace(stage); setWorkflowQuestionId(id); }}
           onCasualChat={() => openCasualChat()}
           onAddCasualThread={() => openCasualChat(true)}
           onRenameProject={openProjectRename}
           onRemoveProject={(item) => { setError(""); setRemovingProject(item); }}
           onResetProject={(item) => { setError(""); setResettingProject(item); }}
+          onArchiveProject={(item, archived) => void act(async () => { const result = await request({ type: "project.archive", projectId: item.id, archived }); if (result.snapshot) acceptSnapshot(result.snapshot); if (archived && item.id === projectId) setInsideProject(false); })}
           onBack={() => setInsideProject(false)}
           onDimension={(id) => { setError(""); selectWorkspace(id); setDimensionAttempt((value) => value + 1); }} onThread={selectThread}
           onRenameThread={(item) => { setError(""); setRenamingThreadId(item.id); setName(item.title); setModal("rename"); }}
@@ -1314,11 +1326,11 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
         />
 
         <main className="main">
-          <header className="topbar">
+          <header className={`topbar ${insideProject && project && !casualMode ? "workspace-page-header" : ""}`} hidden={showVisualLibrary || showStructuredWorkspace || showProjectOverview}>
             {showReadingWorkspace && <div className="breadcrumbs"><BookOpen size={16} /><strong>赛题研读</strong></div>}
             {showAttachmentWorkspace && <div className="breadcrumbs"><Paperclip size={16} /><strong>附件分析</strong></div>}
-            {showConversation && !casualMode && !showStructuredWorkspace && view === "conversation" && !!timeline.length && (
-              <div className="breadcrumbs"><WorkspaceLogo dimension={dimension} className="workspace-logo-compact" /><strong>{dimensionName(dimension)}</strong></div>
+            {insideProject && project && !casualMode && !showStructuredWorkspace && view === "conversation" && (
+              <WorkspaceHeading dimension={dimension} projectName={projectDisplayName(project)} title={dimensionName(dimension)}/>
             )}
             {insideProject && dimension === "chart" && showConversation && <button type="button" className="visual-library-back" onClick={() => selectWorkspace("chart")}><VisualizationIcon size={15} />可视化工作台</button>}
           </header>
@@ -1396,6 +1408,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
               <VisualDesignWorkspace
                 key={project.id}
                 projectId={project.id}
+                projectName={projectDisplayName(project)}
                 onFilesChanged={loadFiles}
               />
             </div>}
@@ -1428,7 +1441,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
                       <h2 id="recent-workspaces-title">继续最近的赛题</h2>
                     </div>
                     <div className="workspace-welcome-projects">
-                      {[...visibleProjects]
+                      {visibleProjects.filter(item => !item.archived)
                         .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
                         .slice(0, 3)
                         .map((item) => (
@@ -1443,11 +1456,9 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
                 )}
               </section>
             ) : showProjectOverview ? (
-              <div className="empty-state project-overview-empty">
-                <WorkspaceLogo dimension="overview" />
-                <h2>项目总览</h2>
-                <p>总览、调度与成果查看界面待后续设计。</p>
-              </div>
+              <ModelWorkflowWorkspace key={project.id + ":overview"} project={project} snapshot={snapshot} stage="overview" onChanged={refresh} onOpenFile={openAgentFile} onNavigate={(stage, id) => { setError(""); selectWorkspace(stage, id); setDimensionAttempt(value => value + 1); }} />
+            ) : showModelWorkflow ? (
+              <ModelWorkflowWorkspace key={project.id + ":" + dimension} project={project} snapshot={snapshot} stage={dimension as "model" | "validation"} selectedThread={thread} selectedQuestionId={workflowQuestionId} onChanged={refresh} onOpenFile={openAgentFile} />
             ) : showVisualLibrary ? null : !showConversation && view !== "activity" ? (
               <div className="empty-state">
                 {casualMode ? <>
@@ -1456,8 +1467,6 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
                   <p>新建一个对话，开始聊聊吧。</p>
                   <button className="primary-button" type="button" disabled={busy} onClick={() => openCasualChat(true)}><Plus size={16} />新建对话</button>
                 </> : <>
-                  <WorkspaceLogo dimension={dimension} />
-                  <h2>{dimensionName(dimension)}</h2>
                   <p>从左侧选择已有对话，或为这个工作维度添加一个对话。</p>
                   {isThreadStage(dimension) && (
                     <button className="primary-button" type="button" disabled={busy} onClick={() => openThreadDialog(dimension)}>
@@ -1470,6 +1479,7 @@ export function App({ onStartupReady }: { onStartupReady?: (ready: boolean) => v
               <ReadingWorkspace
                 key={thread.id}
                 projectName={projectDisplayName(project)}
+                projectId={project.id}
                 messages={messages}
                 agentItems={agentItems}
                 files={files}

@@ -1,5 +1,6 @@
 import type { AgentInput } from "./index";
 import type { NativeToolRegistry } from "./visual-design";
+import { writeWorkflowFile } from "../core/workflow";
 import { ATTACHMENT_PHASES, parseAttachmentStage, type AttachmentPhase } from "../contracts/attachment-workflow";
 
 export function createAttachmentTools(input: AgentInput): NativeToolRegistry | undefined {
@@ -34,7 +35,10 @@ export function createAttachmentTools(input: AgentInput): NativeToolRegistry | u
       else if (tool === "publish_attachment_report") {
         if (active !== "writing") error = "请完成阅读、分析、思考并开始输出，再保存报告。";
         else if (typeof data.body !== "string" || !data.body.trim() || data.body.length > 120000) error = "报告正文为空或超过长度限制。";
-        else published = true;
+        else {
+          try { writeWorkflowFile(input.cwd, `attachments/reports/${target.id}.md`, `# ${target.name}\n\n来源：${target.path}\n\n${data.body}`); published = true; }
+          catch (failure) { error = `报告保存失败：${(failure as Error).message}`; }
+        }
       } else if (tool === "set_attachment_stage") {
         const stage = parseAttachmentStage(args);
         if (!stage || stage.phase !== ATTACHMENT_PHASES[index]) error = `当前应推进 ${ATTACHMENT_PHASES[index] ?? "任务结束"}，不能跳过阶段。`;

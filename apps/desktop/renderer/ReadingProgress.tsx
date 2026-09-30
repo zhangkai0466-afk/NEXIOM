@@ -8,6 +8,7 @@ import { readingProgressNotice, readingSteps, type ReadingStep } from "./reading
 import { advanceReadingScroll, readingArrivalDelay } from "./reading-progress-motion";
 import { ReadingElapsed } from "./ReadingElapsed";
 import "./reading-progress.css";
+import { WorkspaceHeading } from "./WorkspaceHeading";
 
 const ReadingAction = memo(function ReadingAction({ id, kind, status, arrivalDelay, final }: ReadingStep & { arrivalDelay: number; final: boolean }) {
   // Keep the initial delay when later snapshots update this node's status.
@@ -29,7 +30,8 @@ function reducedMotion() {
   return document.documentElement.dataset.reduceMotion === "true" || matchMedia("(prefers-reduced-motion: reduce)").matches;
 }
 
-export function ReadingProgress({ run, items, onCancel, onBack, backLabel = "返回研读报告", history = false, onViewReport }: {
+export function ReadingProgress({ projectName, run, items, onCancel, onBack, backLabel = "返回研读报告", history = false, onViewReport }: {
+  projectName: string;
   run: Run;
   items: AgentItem[];
   onCancel: () => void;
@@ -118,6 +120,7 @@ export function ReadingProgress({ run, items, onCancel, onBack, backLabel = "返
   useEffect(() => () => stopScrolling(), []);
 
   return <section className="reading-progress" data-history={history} aria-label="赛题研读进度" aria-busy={run.status === "running"}>
+    <header className="workspace-state-header"><WorkspaceHeading dimension="reading" projectName={projectName} title="赛题研读"/></header>
     <motion.div layoutScroll className="reading-progress-viewport" ref={viewport} tabIndex={0} aria-label="完整研读阶段链"
       onWheel={event => { if (event.deltaY < 0) browseHistory(); }}
       onPointerDown={browseHistory}

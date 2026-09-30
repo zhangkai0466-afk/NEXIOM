@@ -344,7 +344,6 @@ export class CodexRuntime implements AgentRunner {
       sqlite_home: this.runtimeHome,
       log_dir: path.join(this.runtimeHome, "log"),
       "shell_environment_policy.experimental_use_profile": false,
-      ...(process.platform === "win32" ? { "windows.sandbox": "unelevated" } : {}),
       web_search: readingWebSearchMode(input),
       "sandbox_workspace_write.network_access": input.settings.network,
     };
@@ -357,7 +356,7 @@ export class CodexRuntime implements AgentRunner {
       (input.attachmentTarget ? `\n\n${attachmentWorkflowInstructions}` : "") +
       (input.stageId === "reading" ? readingDeveloperInstructions(input.prompt, input.settings.network) : "") +
       (input.stageId === "model" ? "\n\n建模阶段用户提出的是想法分享与共同讨论。评估其依据、适用条件和取舍；不要将所有人类建议称为人工纠偏，不要未经讨论就改写已确认的题意口径。" : "") +
-      (input.projectMemory
+      (input.stageId !== "validation" && input.projectMemory
         ? `\n\n以下是用户维护的项目记忆，作为当前任务背景；与本轮用户要求冲突时以本轮要求为准。不要自动修改此文档。\n<project_memory>\n${input.projectMemory}\n</project_memory>`
         : "");
     yield* runAppServer({

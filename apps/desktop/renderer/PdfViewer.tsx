@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, FileWarning, Highlighter, List, LoaderCircle, Maximize, Minimize, Minus, MousePointer2, PanelLeft, PenLine, Plus, RotateCw, Search, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Download, Save, FileWarning, Highlighter, List, LoaderCircle, Maximize, Minimize, Minus, MousePointer2, PanelLeft, PenLine, Plus, Search, X } from "lucide-react";
 import { AnnotationEditorType, GlobalWorkerOptions, getDocument, type PDFDocumentProxy, type RenderTask } from "pdfjs-dist";
 import { EventBus, PDFFindController, PDFLinkService, PDFViewer as PdfJsViewer } from "pdfjs-dist/web/pdf_viewer.mjs";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
@@ -30,7 +30,7 @@ class PdfBinaryDataFactory {
   }
 }
 
-interface PdfViewerProps { base64: string; title: string; className?: string; onClose?: () => void }
+interface PdfViewerProps { base64: string; title: string; className?: string; onClose?: () => void; onQuote?: (quote: string) => void; onSave?: (base64: string) => Promise<void> }
 type Outline = NonNullable<Awaited<ReturnType<PDFDocumentProxy["getOutline"]>>>;
 type PdfSession = { viewer: PdfJsViewer; bus: EventBus; link: PDFLinkService; document?: PDFDocumentProxy };
 
@@ -69,7 +69,7 @@ function OutlineItems({ items, link }: { items: Outline; link: PDFLinkService })
   </li>)}</ul>;
 }
 
-export function PdfViewer({ base64, title, className = "", onClose }: PdfViewerProps) {
+export function PdfViewer({ base64, title, className = "", onClose, onQuote, onSave }: PdfViewerProps) {
   const root = useRef<HTMLDivElement>(null);
   const container = useRef<HTMLDivElement>(null);
   const viewerElement = useRef<HTMLDivElement>(null);
@@ -91,6 +91,19 @@ export function PdfViewer({ base64, title, className = "", onClose }: PdfViewerP
   const [editor, setEditor] = useState<number>(AnnotationEditorType.NONE);
   const [fullscreen, setFullscreen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selection, setSelection] = useState<{ text: string; x: number; y: number }>();
+  useEffect(() => {
+    const selected = () => {
+      const value = window.getSelection();
+      if (!value || value.isCollapsed || !value.rangeCount || !container.current?.contains(value.anchorNode) || !container.current?.contains(value.focusNode)) { setSelection(undefined); return; }
+      const text = value.toString().trim();
+      const rect = value.getRangeAt(0).getBoundingClientRect();
+      const bounds = root.current!.getBoundingClientRect();
+      setSelection(text ? { text: text.slice(0, 3500), x: Math.max(8, Math.min(rect.left - bounds.left, bounds.width - 210)), y: Math.max(42, rect.top - bounds.top - 42) } : undefined);
+    };
+    document.addEventListener("selectionchange", selected);
+    return () => document.removeEventListener("selectionchange", selected);
+  }, [base64]);
 
   useEffect(() => {
     if (!container.current || !viewerElement.current) return;
@@ -174,7 +187,7 @@ export function PdfViewer({ base64, title, className = "", onClose }: PdfViewerP
     try { session.current.viewer.annotationEditorMode = { mode }; setEditor(mode); }
     catch { setNotice("此 PDF 暂不支持批注。"); }
   }
-  async function download() {
+  async function download(save = false) {
     const current = session.current;
     if (!current?.document) return;
     setSaving(true); setNotice("");
@@ -182,11 +195,16 @@ export function PdfViewer({ base64, title, className = "", onClose }: PdfViewerP
       current.viewer.annotationEditorMode = { mode: AnnotationEditorType.NONE };
       const bytes = await current.document.saveDocument();
       if (session.current !== current) return;
+      if (save && onSave) {
+        let binary = "";
+        for (let i = 0; i < bytes.length; i += 8192) binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+        await onSave(btoa(binary)); setNotice("批注 PDF 已保存到项目。"); return;
+      }
       const url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], { type: "application/pdf" }));
       const anchor = document.createElement("a"); anchor.href = url;
       anchor.download = title.replace(/\.pdf$/i, "") + (current.document.annotationStorage.size ? "-批注" : "") + ".pdf";
       anchor.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch { setNotice("PDF 下载失败，请重试。"); }
+    } catch (error) { setNotice(`PDF 保存失败：${error instanceof Error ? error.message : "请重试"}`); }
     finally { setSaving(false); }
   }
   const button = (label: string, icon: ReactNode, action: () => void, disabled = !pdf, active?: boolean) =>
@@ -197,8 +215,13 @@ export function PdfViewer({ base64, title, className = "", onClose }: PdfViewerP
     if (event.key === "Escape" && finding) { setFinding(false); session.current?.bus.dispatch("findbarclose", { source: root.current }); }
   }} tabIndex={-1} aria-label={`${title} PDF 查看器`}>
     <style>{scopedViewerCss}</style>
+    {selection && <div className="pdf-selection-menu" style={{ left: selection.x, top: selection.y }} onPointerDown={event => event.preventDefault()}>
+      <button onClick={() => void navigator.clipboard.writeText(selection.text).catch(() => setNotice("复制失败，请使用 Ctrl+C。"))}>复制</button>
+      {onQuote && <button onClick={() => { onQuote(`> ${selection.text.replaceAll("\n", "\n> ")}\n\n`); setSelection(undefined); }}>在对话中聊聊</button>}
+    </div>}
     <div className="nexiom-pdf-toolbar" role="toolbar" aria-label="PDF 查看工具">
       <div className="nexiom-pdf-tools-left">
+        {onSave && button("保存批注到项目", saving ? <LoaderCircle size={17} /> : <Save size={17} />, () => void download(true), !pdf || saving)}
         <div className="nexiom-pdf-group">
         {button("文档目录", <List size={17} />, () => setSide(side === "outline" ? null : "outline"), !pdf, side === "outline")}
         {button("页面缩略图", <PanelLeft size={17} />, () => setSide(side === "pages" ? null : "pages"), !pdf, side === "pages")}
@@ -225,7 +248,6 @@ export function PdfViewer({ base64, title, className = "", onClose }: PdfViewerP
           {!["auto", "page-width", "page-fit", "0.5", "0.75", "1", "1.25", "1.5", "2", "3", "4"].includes(zoom) && <option value={zoom}>{Math.round(scale * 100)}%</option>}
         </select>
         {button("放大 PDF", <Plus size={17} />, () => session.current?.viewer.increaseScale(), !pdf || scale >= 10)}
-        {button("旋转 PDF", <RotateCw size={17} />, () => { if (session.current) session.current.viewer.pagesRotation = (session.current.viewer.pagesRotation + 90) % 360; })}
       </div>
       </div>
       <div className="nexiom-pdf-group nexiom-pdf-actions">
@@ -245,7 +267,7 @@ export function PdfViewer({ base64, title, className = "", onClose }: PdfViewerP
       <label><input type="checkbox" checked={caseSensitive} onChange={event => setCaseSensitive(event.target.checked)} />区分大小写</label>
       {button("关闭搜索", <X size={16} />, () => { setFinding(false); session.current?.bus.dispatch("findbarclose", { source: root.current }); }, false)}
     </div>}
-    {notice && <div className="nexiom-pdf-notice" role="status">{notice}</div>}
+    {notice && <div className="nexiom-pdf-notice" data-success={notice === "批注 PDF 已保存到项目。"} role="status">{notice}</div>}
     <div className="nexiom-pdf-body">
       {side && <aside className="nexiom-pdf-sidebar" aria-label={side === "pages" ? "页面缩略图" : "文档目录"}>
         {side === "pages" && pdf && Array.from({ length: pdf.numPages }, (_, index) => <Thumbnail key={index} pdf={pdf} number={index + 1} active={pageNumber === index + 1} onSelect={() => goToPage(index + 1)} />)}

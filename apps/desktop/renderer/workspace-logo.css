@@ -1,4 +1,4 @@
-.workspace-logo {
+:root {
   --dimension-overview: #FC757B;
   --dimension-reading: #F97F5F;
   --dimension-attachments: #FAA26F;
@@ -7,6 +7,8 @@
   --dimension-chart: #B0D6A9;
   --dimension-paper: #65BDBA;
   --dimension-delivery: #3C9BC9;
+}
+.workspace-logo {
   width: 44px;
   height: 44px;
   flex: 0 0 auto;
@@ -31,6 +33,19 @@
 .workspace-logo-compact > svg { width: 18px; height: 18px; }
 .thread-empty > .workspace-logo { margin-bottom: 22px; }
 .reading-report-title { min-width: 0; display: flex; align-items: center; gap: 12px; }
+.workspace-heading { display:flex; align-items:center; gap:12px; min-width:0; }
+.workspace-heading-copy { min-width:0; }.workspace-heading-project { display:flex; align-items:center; gap:6px; font-size:12px; line-height:20px; color:var(--muted); }.workspace-heading-project>span { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.workspace-heading .workspace-heading-copy h1 { font-family:var(--font-ui-emphasis); font-size:1.32rem; line-height:1.3; font-weight:650; letter-spacing:0; margin:4px 0 1px; }
+.workspace-heading .workspace-heading-copy p { color:var(--faint); font-size:12px; line-height:20px; margin:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.workflow-page-heading { margin-bottom:26px; }
+.topbar.workspace-page-header { min-height:91px; height:auto; padding:15px 20px; flex-shrink:0; }
+.vws-header>.workspace-heading { flex:1; }
+.workspace-state-header { flex-shrink:0; padding:18px 24px; display:flex; align-items:center; min-height:91px; }
+.reading-intake.workspace-intake { padding:0 24px 24px; }
+.workspace-intake > .workspace-state-header { margin-inline:-24px; }
+.workspace-intake > .reading-back-button, .reading-progress > .reading-back-button { top:100px; }
+.workspace-intake > .reading-intake-content { padding-block:56px; }
+.workspace-intake .reading-intake-heading h2 { font-size:1.2rem; margin:0; font-weight:600; }
 @media (forced-colors: active) {
   .workspace-logo[data-dimension] { color: CanvasText; background: Canvas; }
 }

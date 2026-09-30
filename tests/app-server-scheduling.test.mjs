@@ -87,11 +87,7 @@ test("a buffered flood of filtered native events yields to the event loop before
   assert.deepEqual(
     fixture.requests.find(value => value.method === "turn/start").params.sandboxPolicy,
     {
-      type: "workspaceWrite",
-      writableRoots: ["C:/fixture/project"],
-      networkAccess: false,
-      excludeTmpdirEnvVar: true,
-      excludeSlashTmp: true,
+      type: "dangerFullAccess",
     },
   );
 });

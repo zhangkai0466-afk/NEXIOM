@@ -18,6 +18,7 @@ import logo from "../../../assets/brand/nexiom-desktop-icon-1024.png";
 import { AgentTaskStatus } from "./AgentTaskStatus";
 import { getAgentItemOutcome, getAgentTaskKind } from "./agent-task-state";
 import { readingProseTables } from "./reading-prose-tables";
+import { repairCjkStrong } from "./markdown-repair";
 
 const visualOperationNames: Record<string, string> = {
   health_check: "检查绘图环境",
@@ -58,7 +59,7 @@ export function RichText({
             ? url
             : ""
         }
-        remarkPlugins={reading ? [remarkGfm, remarkMath, readingProseTables] : [remarkGfm, remarkMath]}
+        remarkPlugins={reading ? [remarkGfm, remarkMath, repairCjkStrong, readingProseTables] : [remarkGfm, remarkMath, repairCjkStrong]}
         rehypePlugins={[rehypeKatex]}
         components={{
           table({ children }) {

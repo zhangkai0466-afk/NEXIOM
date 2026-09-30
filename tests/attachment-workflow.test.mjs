@@ -20,9 +20,11 @@ const target = { id: "A01", path: files[0].path, name: "附件1.xlsx" };
 const usage = { input_tokens: 10, cached_input_tokens: 2, cache_write_input_tokens: 0, output_tokens: 3, reasoning_output_tokens: 1 };
 const stateOf = snapshot => attachmentAnalysis(snapshot.messages, snapshot.items, snapshot.runs);
 
-test("attachment phases enforce one target, serial work and publication before output completion", async () => {
+test("attachment phases enforce one target, serial work and publication before output completion", async t => {
+  const cwd = await mkdtemp(path.join(tmpdir(), "nexiom-attachment-publish-"));
+  t.after(() => rm(cwd, { recursive: true, force: true }));
   const abort = new AbortController();
-  const tools = createAttachmentTools({ stageId: "attachments", attachmentTarget: target, signal: abort.signal });
+  const tools = createAttachmentTools({ cwd, stageId: "attachments", attachmentTarget: target, signal: abort.signal });
   const stage = (phase, status, attachmentId = target.id) => tools.call("nexiom_attachments", "set_attachment_stage", { attachmentId, phase, status });
   const publish = body => tools.call("nexiom_attachments", "publish_attachment_report", { attachmentId: target.id, body });
   assert.equal(createAttachmentTools({ stageId: "reading" }), undefined);

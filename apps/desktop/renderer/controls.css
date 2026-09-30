@@ -1,0 +1,32 @@
+/* Shared controls retain native keyboard and screen-reader behavior. */
+select { min-width:0; max-width:100%; min-height:34px; padding:6px 10px; border:1px solid var(--border); border-radius:8px; background:var(--panel); color:var(--text); font-size:13px; line-height:20px; text-overflow:ellipsis; cursor:pointer; }
+select:disabled { opacity:.5; cursor:not-allowed; }
+select:not(:disabled):hover { border-color:var(--strong-border); }
+select:focus-visible, .vws select:focus-visible { outline:none; border-color:var(--link); box-shadow:0 0 0 2px color-mix(in srgb,var(--link) 18%,transparent); }
+select option { background:var(--panel); color:var(--text); }
+@supports (appearance: base-select) {
+  select, select::picker(select) { appearance:base-select; }
+  select { align-items:center; gap:12px; }
+  select::picker-icon { color:var(--muted); width:12px; flex-shrink:0; transition:rotate 150ms ease; }
+  select:open::picker-icon { rotate:180deg; }
+  select::picker(select) { margin-block:5px; padding:5px; border:1px solid var(--strong-border); border-radius:10px; background:var(--panel); color:var(--text); box-shadow:0 8px 28px #0003; max-height:min(320px,50vh); max-width:calc(100vw - 24px); overflow:auto; font:inherit; }
+  select option { min-height:34px; padding:7px 10px; border-radius:5px; font-size:13px; line-height:20px; white-space:normal; overflow-wrap:anywhere; cursor:pointer; gap:10px; }
+  select option:hover, select option:focus { outline:none; background:var(--hover); }
+  select option:checked { background:var(--selected); }
+  select option::checkmark { color:var(--link); order:1; margin-left:auto; }
+}
+.workflow-actions select { flex:0 1 auto; min-width:110px; }
+.workflow-discussion { transition:border-color 150ms,box-shadow 150ms; }
+.workflow-discussion:focus-within { border-color:var(--strong-border); box-shadow:0 0 0 2px color-mix(in srgb,var(--link) 9%,transparent); }
+.project-tools input:not([type="checkbox"]):not([type="file"]) { width:100%; min-height:36px; margin-top:7px; padding:8px 11px; border:1px solid var(--border); border-radius:8px; background:var(--surface); }
+.project-tools input:focus-visible { outline:none; border-color:var(--link); }
+.project-tools pre { overflow:auto; max-width:100%; border-radius:8px; }.project-tools form>label { display:block; }
+.vws-design-start { gap:12px; padding:12px 0 16px; }.vws-design-start label { display:grid; min-width:0; gap:6px; color:var(--muted); font-size:12px; }.vws-design-start select { margin:0; width:100%; }.vws-design-start button { min-height:36px; padding:8px 10px; font-size:12px; border-radius:8px; line-height:18px; }.vws-design-start .vws-create { border:1px solid var(--border); }
+.vws input:focus-visible { outline:none; border-color:var(--link); box-shadow:0 0 0 2px color-mix(in srgb,var(--link) 15%,transparent); }
+.vws-search:focus-within { border-color:var(--link); box-shadow:0 0 0 2px color-mix(in srgb,var(--link) 15%,transparent); }.vws-search input:focus-visible { box-shadow:none; }
+.workflow-workspace .workflow-actions button { max-width:100%; }.workflow-workspace .workflow-actions { row-gap:8px; }
+.workflow-workspace .workflow-question-summary .workflow-actions { margin:12px 0; }
+.workflow-workspace details.project-final-models { margin-top:28px; }.workflow-workspace details.project-final-models p { color:var(--muted); font-size:13px; }
+.workflow-tabs button { white-space:nowrap; }
+.nexiom-pdf-group select { min-height:28px; padding:3px 6px; }
+@media (prefers-reduced-motion:reduce) { .project-monitor .thinking-pixel-trail>span::before,.project-monitor .thinking-pixel-trail>span::after { animation:none; } }

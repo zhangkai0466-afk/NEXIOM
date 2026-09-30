@@ -342,11 +342,13 @@ test("research must follow review and must be reviewed before writing; offline c
   }
 });
 
-test("reading report prohibits modeling advice and does not require wide evidence tables", () => {
-  assert.match(readingReportStructure, /严禁输出可行路线、建模建议/);
-  assert.doesNotMatch(readingReportStructure, /### 可行路线|按推荐顺序列出路线|列固定为/);
-  assert.match(readingReportStructure, /长篇证据与解释不用表格/);
-  assert.match(readingWorkflowInstructions, /旧报告包含这些内容，更新报告时也须移除/);
+test("reading report follows the guide with eight human-readable question sections and limited initial ideas", () => {
+  for (const heading of ["问题重述", "问题理解", "当前具备", "问题约束", "与其他小问的继承关系", "理解阶段的初步分析与建模小思", "解题验收", "解读误区"]) assert.ok(readingReportStructure.includes(heading));
+  assert.match(readingReportStructure, /不正式求解/);
+  assert.match(readingReportStructure, /长段解释不用表格/);
+  assert.match(readingReportStructure, /不得使用针对固定赛题的名词库/);
+  assert.match(readingReportStructure, /## 文献调研/);
+  assert.match(readingWorkflowInstructions, /不执行正式建模或求解/);
 });
 
 test("wide narrative tables become prose without losing links, equations or short comparison tables", () => {

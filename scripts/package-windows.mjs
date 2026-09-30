@@ -56,10 +56,10 @@ await rcedit(path.join(destination, "NEXIOM.exe"), {
 });
 const app = path.join(destination, "resources/app");
 await mkdir(app, { recursive: true });
-for (const item of [".build", "dist", "assets/brand", "packages/visualization-engine"])
+for (const item of [".build", "dist", "assets/brand", "packages/visualization-engine", "node_modules/katex"])
   await cp(item, path.join(app, item), {
     recursive: true,
-    filter: (source) => !source.endsWith(".map") && !/[\\/](?:__pycache__|\.pytest_cache|PaperSpec)(?:[\\/]|$)/.test(source) && !source.endsWith(".pyc"),
+    filter: (source) => !source.endsWith(".map") && !/[\\/](?:__pycache__|\.pytest_cache|PaperSpec|isolation-inspect)(?:[\\/]|$)/.test(source) && !source.endsWith(".pyc"),
   });
 await writeFile(
   path.join(app, "package.json"),

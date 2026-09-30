@@ -24,6 +24,9 @@ import {
   type ProjectFile,
 } from "../contracts";
 import { acquireLease } from "./lease";
+import { exportModelDocuments } from "./model-export";
+import { ProjectTerminals, readPlugins, storePlugin, pluginSchema, inspectGit, createWorktree } from "./project-tools";
+import { readWorkflow, workflowArchived, saveWorkflow, syncWorkflow, workflowMutation, prepareWorkflowJob } from "./workflow";
 import { AgentCoordinator } from "./agent";
 import type { AgentRunner } from "../runtime";
 import { CodexRuntime } from "../runtime/codex";
@@ -235,6 +238,7 @@ function initializeProviders(db: DatabaseSync, schemaVersion: number) {
 }
 
 export class CoreService {
+  private terminals = new ProjectTerminals();
   private db!: DatabaseSync;
   private releaseLease: () => void;
   private closed = false;
@@ -439,6 +443,13 @@ export class CoreService {
     if (!thread) throw new Error("会话不存在。");
     return readThread(thread);
   }
+  private assertUnmanagedThread(thread: Thread) {
+    const project = this.project(thread.projectId);
+    if (!existsSync(project.root)) return;
+    const state = readWorkflow(project.root);
+    if ([...state.questions, ...(state.retiredQuestions ?? [])].some(q => [...q.independent.jobs, ...q.collaborative.jobs].some(j => j.threadId === thread.id)))
+      throw new Error("此会话关联建模成果与检验版本，请通过建模工作台新建路线或修订，不能单独移动、删除或分叉。");
+  }
   private editableConversation(thread: Thread) {
     if (!conversationStages.has(thread.stageId))
       throw new Error("项目固定对话不能执行此操作。");
@@ -521,7 +532,7 @@ export class CoreService {
         ...(this.tokenActivity.warning ? { tokenActivityWarning: this.tokenActivity.warning } : {}),
         projects: this.db
           .prepare("SELECT * FROM projects ORDER BY createdAt")
-          .all() as unknown as Project[],
+          .all().map(row => ({ ...row, ...(existsSync(String(row.root)) && workflowArchived(String(row.root)) ? { archived: true } : {}) })) as unknown as Project[],
         questions: this.db
           .prepare("SELECT * FROM questions ORDER BY createdAt")
           .all() as unknown as Question[],
@@ -894,8 +905,101 @@ export class CoreService {
       case "agent.submit": {
         const thread = this.thread(command.threadId);
         const project = await this.projectWorkspace(thread.projectId);
+        const state = syncWorkflow(this.db, project);
+        const question = state.questions.find(q => q.id === thread.questionId);
+        const route = question && (["independent", "collaborative"] as const).find(r => question[r].jobs.some(j => j.threadId === thread.id));
+        const previous = route && question ? question[route].jobs.filter(j => j.threadId === thread.id).at(-1) : undefined;
+        if (previous?.task === "validation") throw new Error("请在模型检验工作台发起独立检验，或将反馈返回上游。");
         const runId = this.agent.start(command, project.root);
+        if (question && route && previous && !question[route].jobs.some(j => j.runId === runId)) {
+          question[route].jobs.push({ runId, threadId: thread.id, task: previous.task, status: "running", folder: previous.folder });
+          delete question.selected; saveWorkflow(project.root, state);
+        }
         return { ...this.snapshot(), runId };
+      }
+      case "workflow.read": {
+        const project = await this.projectWorkspace(command.projectId);
+        return { workflow: syncWorkflow(this.db, project) };
+      }
+      case "visual.design.start": {
+        const project = await this.projectWorkspace(command.projectId);
+        const state = syncWorkflow(this.db, project);
+        if (!state.questions.length || state.questions.some(q => !q.selected)) throw new Error("请先检验并确认所有小问的最终模型。");
+        const sourcePaths = state.questions.map(q => `${q[q.selected!.route].jobs.find(j => j.runId === q.selected!.runId)!.folder}/solution.md`);
+        if (command.library === "paper") {
+          if (!state.visualJobs?.some(j => j.library === "modeling" && this.db.prepare("SELECT status FROM runs WHERE id=?").get(j.runId)?.status === "succeeded")) throw new Error("请先完成针对建模方案的图表设计。");
+          if (!command.argumentPath || !/\.md$/i.test(command.argumentPath)) throw new Error("请选择并确认论文论述初稿 Markdown 文件。");
+          const file = checkedFile(project.root, command.argumentPath);
+          if (!(await lstat(file)).isFile()) throw new Error("论文论述初稿不存在。");
+          sourcePaths.push(command.argumentPath);
+        }
+        const thread: Thread = { id: randomUUID(), projectId: project.id, questionId: null, stageId: "chart", title: command.library === "modeling" ? "建模方案可视化" : "论文论述可视化", createdAt: now(), archivedAt: null, unread: false };
+        this.db.prepare("INSERT INTO threads(id,projectId,title,createdAt,stageId,questionId) VALUES(?,?,?,?,?,NULL)").run(thread.id, project.id, thread.title, thread.createdAt, thread.stageId);
+        const text = `根据以下已检验并确认的方案进行${thread.title}。先读取原题、附件及来源文件。每张图说明读者要看懂什么、图像的目的与放置理由，区分增强论述、补充论述、展示解答、比较表现。根据真实数据和推导设计，不能为了美观伪造数值。\n来源文件：\n${sourcePaths.join("\n")}\n\n使用 nexiom_visual 原生可视化工具创建可编辑语义素材，library 必须为 ${command.library}，成果保存 outputs/visual-design/${command.library}/，不改动另一支线。图形必须保留可移动元素和系列配色，供工作台继续编辑。建模图表无论论文最终是否采用都要独立保留。先形成设计说明再实际生成并检查图像。`;
+        let runId: string;
+        try { runId = this.agent.start({ type: "agent.submit", threadId: thread.id, text, clientRequestId: randomUUID() }, project.root); }
+        catch (e) { this.db.prepare("DELETE FROM threads WHERE id=?").run(thread.id); throw e; }
+        (state.visualJobs ??= []).push({ library: command.library, runId, threadId: thread.id, sourcePaths, createdAt: now() }); saveWorkflow(project.root, state);
+        this.publish(); return { ...this.snapshot(), runId, thread, workflow: state };
+      }
+      case "workflow.export": {
+        const project = await this.projectWorkspace(command.projectId);
+        if (!/^modeling\/(?:问题\d+\/(?:independent|collaborative)\/[a-z0-9-]+\/solution|final\/最终模型)\.md$/.test(command.path)) throw new Error("只能导出项目建模方案。");
+        const state = syncWorkflow(this.db, project);
+        if (command.path === "modeling/final/最终模型.md" && (!state.questions.length || state.questions.some(q => !q.selected))) throw new Error("最终模型已发生变更，请重新检验并确认后导出。");
+        return { exported: await exportModelDocuments(project.root, command.path), project };
+      }
+      case "terminal.open": return { terminal: this.terminals.open(command.projectId, (await this.projectWorkspace(command.projectId)).root) };
+      case "terminal.read": return { terminal: this.terminals.read(command.projectId, command.id) };
+      case "terminal.write": return { terminal: this.terminals.write(command.projectId, command.id, command.text) };
+      case "terminal.close": return { terminal: this.terminals.close(command.projectId, command.id) };
+      case "plugins.list": return { plugins: readPlugins((await this.projectWorkspace(command.projectId)).root) };
+      case "plugins.install": {
+        const project = await this.projectWorkspace(command.projectId);
+        return { plugins: storePlugin(project.root, pluginSchema.parse(JSON.parse(command.manifest))) };
+      }
+      case "plugins.toggle": {
+        const project = await this.projectWorkspace(command.projectId);
+        const plugin = readPlugins(project.root).find(p => p.id === command.id);
+        if (!plugin) throw new Error("插件不存在。");
+        return { plugins: storePlugin(project.root, { ...plugin, enabled: command.enabled }) };
+      }
+      case "git.inspect": return { git: await inspectGit((await this.projectWorkspace(command.projectId)).root) };
+      case "git.worktree": return { savedPath: await createWorktree((await this.projectWorkspace(command.projectId)).root, command.name) };
+      case "workflow.update": {
+        const project = await this.projectWorkspace(command.projectId);
+        if (command.change.action !== "start") {
+          const workflow = workflowMutation(this.db, project, command.change);
+          this.event(project.id, "workflow.updated", "已保存工作流变更。"); this.publish();
+          return { ...this.snapshot(), workflow };
+        }
+        if (this.db.prepare("SELECT id FROM runs WHERE projectId=? AND status='running'").get(project.id)) throw new Error("此项目已有任务正在执行。");
+        const prepared = prepareWorkflowJob(this.db, project, command.change);
+        const t = prepared.thread;
+        this.db.prepare("INSERT INTO threads(id,projectId,title,createdAt,stageId,questionId) VALUES(?,?,?,?,?,?)").run(t.id, t.projectId, t.title, t.createdAt, t.stageId, t.questionId);
+        let runId: string;
+        try { runId = this.agent.start({ type: "agent.submit", threadId: t.id, text: prepared.prompt, clientRequestId: randomUUID() }, prepared.cwd); }
+        catch (error) { this.db.prepare("DELETE FROM threads WHERE id=?").run(t.id); throw error; }
+        prepared.branch.jobs.push({ runId, threadId: t.id, task: command.change.task, status: "running", folder: prepared.folder, reviewedDigest: prepared.reviewedDigest });
+        saveWorkflow(project.root, prepared.state); this.publish();
+        return { ...this.snapshot(), workflow: prepared.state, thread: t, runId };
+      }
+      case "project.archive": {
+        const project = await this.projectWorkspace(command.projectId);
+        if (this.db.prepare("SELECT id FROM runs WHERE projectId=? AND status='running'").get(project.id)) throw new Error("请等待任务结束再归档项目。");
+        const state = readWorkflow(project.root); state.archived = command.archived; saveWorkflow(project.root, state);
+        this.event(project.id, command.archived ? "project.archived" : "project.restored", command.archived ? "项目已归档。" : "项目已恢复。"); this.publish();
+        return this.snapshot();
+      }
+      case "pdf.save": {
+        const project = await this.projectWorkspace(command.projectId);
+        const bytes = Buffer.from(command.base64, "base64");
+        if (bytes.subarray(0, 5).toString() !== "%PDF-" || bytes.length > 30 * 1024 * 1024) throw new Error("无效或过大的 PDF。");
+        const name = path.basename(command.name).replace(/[<>:"/\\|?*\x00-\x1f]/g, "_").replace(/\.pdf$/i, "");
+        const relative = `reading/annotations/${name}-${Date.now()}-${randomUUID().slice(0, 6)}.pdf`;
+        const target = checkedFile(project.root, relative); mkdirSync(path.dirname(target), { recursive: true }); await writeFile(target, bytes, { flag: "wx" });
+        this.event(project.id, "pdf.saved", `已保存 PDF 批注：${relative}`); this.publish();
+        return { savedPath: relative };
       }
       case "project.create": {
         if (workspaceDriveEnforced() && command.name !== CASUAL_PROJECT_NAME)
@@ -1068,6 +1172,7 @@ export class CoreService {
       }
       case "thread.delete": {
         const thread = this.thread(command.threadId);
+        this.assertUnmanagedThread(thread);
         this.editableConversation(thread);
         this.transaction(() => this.deleteConversationRecords(thread));
         this.projectChanged(thread.projectId);
@@ -1076,6 +1181,7 @@ export class CoreService {
       }
       case "thread.move": {
         const thread = this.thread(command.threadId);
+        this.assertUnmanagedThread(thread);
         this.editableConversation(thread);
         const target = this.project(command.projectId);
         if (target.id === thread.projectId) return { ...this.snapshot(), thread };
@@ -1101,6 +1207,7 @@ export class CoreService {
       }
       case "thread.fork": {
         const source = this.thread(command.threadId);
+        this.assertUnmanagedThread(source);
         this.editableConversation(source);
         const projectId = command.projectId ?? source.projectId;
         this.project(projectId);
@@ -1331,6 +1438,7 @@ export class CoreService {
   }
 
   async close() {
+    await this.terminals.dispose();
     if (this.closed) return;
     this.closed = true;
     await this.agent.close();

@@ -21,6 +21,7 @@ import type { AccountProfile, TokenActivity } from "../../../packages/contracts"
 import { request } from "./bridge";
 import { aggregateTokenUsage, localDateKey, tokenRate, usageLevel, type UsageDay } from "./token-usage";
 import "./account.css";
+import { AvatarPreview } from "./AvatarPreview";
 
 const compactCount = new Intl.NumberFormat("zh-CN", {
   notation: "compact",
@@ -29,7 +30,7 @@ const compactCount = new Intl.NumberFormat("zh-CN", {
 const CROP_VIEWPORT = 320;
 const CROP_PAN_MARGIN = 24;
 const sameProfile = (a: AccountProfile, b: AccountProfile) =>
-  a.nickname === b.nickname && a.avatar === b.avatar;
+  a.nickname === b.nickname && a.avatar === b.avatar && a.avatarOriginal === b.avatarOriginal;
 const percent = (value: number | null) =>
   value == null ? "尚无数据" : `${(value * 100).toFixed(1)}%`;
 
@@ -285,7 +286,7 @@ export function AccountSettings({
         context.imageSmoothingEnabled = true;
         context.imageSmoothingQuality = "high";
         context.drawImage(bitmap, sourceX, sourceY, sourceSize, sourceSize, 0, 0, 512, 512);
-        setDraft((current) => ({ ...current, avatar: canvas.toDataURL("image/png") }));
+        setDraft((current) => ({ ...current, avatar: canvas.toDataURL("image/png"), avatarOriginal: cropAsset.url }));
         setCropAsset(null);
       } finally {
         bitmap.close();
@@ -418,10 +419,12 @@ export function AccountSettings({
       </header>
 
       <section className="account-identity" aria-label="账户资料">
+        <AvatarPreview source={draft.avatarOriginal ?? draft.avatar}>
         <button type="button" className="account-avatar account-avatar-button" onClick={() => setEditing(true)} aria-label="编辑头像">
           {draft.avatar ? <img src={draft.avatar} alt="账户头像" /> : <UserRound size={45} strokeWidth={1.25} />}
           <span><Pencil size={14} /></span>
         </button>
+        </AvatarPreview>
         <h2>{draft.nickname}</h2>
         {saved && <span className="account-saved"><Check size={14} />资料已保存</span>}
       </section>
@@ -540,7 +543,7 @@ export function AccountSettings({
                     {cropBusy && <LoaderCircle size={14} className="spin" />}选择图片
                   </button>
                   {draft.avatar && <button type="button" className="text-button" disabled={cropBusy} onClick={() => {
-                    setDraft((current) => ({ ...current, avatar: null }));
+                    setDraft((current) => ({ ...current, avatar: null, avatarOriginal: null }));
                     setSaved(false);
                   }}>移除</button>}
                 </div>
